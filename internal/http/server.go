@@ -20,7 +20,7 @@ type Server struct {
 
 func (s *Server) Router() http.Handler {
 	r := chi.NewRouter()
-	r.Use(middleware.RequestID, middleware.RealIP, middleware.Recoverer, Metrics)
+    r.Use(middleware.RequestID, middleware.Recoverer, Metrics)
 
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(200) })
 	r.Get("/readyz", func(w http.ResponseWriter, req *http.Request) {

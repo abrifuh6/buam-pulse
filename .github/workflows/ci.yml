@@ -7,7 +7,7 @@ on:
   pull_request:
 
 env:
-  GO_VERSION: "1.25"          # must match go.mod and Dockerfile
+  GO_VERSION: "1.26"          # must match go.mod and Dockerfile
   DOCKERHUB_NS: buamtech
   GHCR_NS: ghcr.io/${{ github.repository_owner }}
 
