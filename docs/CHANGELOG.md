@@ -45,3 +45,10 @@
 - Pods run non-root (uid 65532), have readiness/liveness probes, requests/limits, Prometheus scrape annotations
 - make kind-load, deploy-dev, undeploy-dev
 - Fix: migrate hook changed from pre-install to post-install,pre-upgrade (dev Postgres lives in the chart). See ADR 0002.
+- Phase 2 complete: full stack verified on Docker Desktop Kubernetes (6 pods), end-to-end check passing through the cluster
+
+
+## 2026-09-09 — Phase 3 step 1: CI
+- GitHub Actions: vet, golangci-lint, race tests, helm lint → matrix build of 4 images → Trivy scan (fails on unfixed CRITICAL/HIGH) → push to GHCR and Docker Hub (buamtech)
+- Tags: git SHA always, latest on main, semver on v* tags; PRs build+scan only
+- .golangci.yml added

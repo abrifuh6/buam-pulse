@@ -137,3 +137,8 @@ Every service exposes Prometheus metrics:
 ```bash
 curl -s localhost:9090/metrics | grep ^pulse_
 ```
+
+
+## CI/CD
+
+Every push runs `.github/workflows/ci.yml`: static checks and tests, then a parallel build of the four service images, a Trivy vulnerability scan, and — on `main` only — a push to `ghcr.io/abrifuh6/pulse-*` and `docker.io/buamtech/pulse-*`, tagged by git SHA.
