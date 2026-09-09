@@ -52,3 +52,5 @@
 - GitHub Actions: vet, golangci-lint, race tests, helm lint → matrix build of 4 images → Trivy scan (fails on unfixed CRITICAL/HIGH) → push to GHCR and Docker Hub (buamtech)
 - Tags: git SHA always, latest on main, semver on v* tags; PRs build+scan only
 - .golangci.yml added
+- Dependencies updated for Trivy findings; toolchain moved to Go 1.26 (go.mod, Dockerfile, CI together)
+- Removed chi RealIP middleware: trusts X-Forwarded-For from any client (GHSA-3fxj-6jh8-hvhx). Client IP handling will be done at the load balancer in Phase 4.
