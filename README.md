@@ -122,3 +122,18 @@ curl -s localhost:8080/api/v1/monitors -H "Authorization: Bearer $TOKEN"
 # 4. results
 curl -s localhost:8080/api/v1/monitors/<id>/results -H "Authorization: Bearer $TOKEN"
 ```
+
+
+## Metrics
+
+Every service exposes Prometheus metrics:
+
+| Service | URL |
+|---------|-----|
+| api | http://localhost:8080/metrics |
+| worker | http://localhost:9090/metrics |
+| scheduler | http://localhost:9091/metrics |
+
+```bash
+curl -s localhost:9090/metrics | grep ^pulse_
+```

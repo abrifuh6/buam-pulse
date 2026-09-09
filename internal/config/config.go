@@ -14,6 +14,7 @@ type Config struct {
 	APIPort     string
 	Region      string // which worker region produced a result
 	JWTSecret   string
+	MetricsPort string
 }
 
 func Load() (Config, error) {
@@ -23,6 +24,7 @@ func Load() (Config, error) {
 		APIPort:     getenv("API_PORT", "8080"),
 		Region:      getenv("PULSE_REGION", "local"),
 	    JWTSecret:   os.Getenv("JWT_SECRET"),
+	    MetricsPort: getenv("METRICS_PORT", "9090"),
 	}
 	if c.DatabaseURL == "" || c.RedisURL == "" {
 		return c, fmt.Errorf("DATABASE_URL and REDIS_URL are required")

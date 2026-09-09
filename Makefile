@@ -25,7 +25,7 @@ run-api:
 	go run ./apps/api/cmd/api
 
 run-scheduler:
-	go run ./apps/scheduler/cmd/scheduler
+	METRICS_PORT=9091 go run ./apps/scheduler/cmd/scheduler
 
 run-worker:
 	go run ./apps/worker/cmd/worker

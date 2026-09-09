@@ -17,3 +17,11 @@
 - New env var JWT_SECRET (see .env.example); new deps golang-jwt, x/crypto
 - Fix: Config struct was missing the JWTSecret field
 - Fix: checks_test used t.Context() (Go 1.24+); switched to context.Background() to honour go.mod's 1.22
+
+- Phase 1 verified end to end: signup → create monitor → scheduler enqueue → worker check → status "up"
+
+
+## 2026-09-09 — Phase 1 step 3: Prometheus metrics
+- internal/metrics: checks total/latency, queue depth, scheduler enqueued, API request count/latency
+- Worker and scheduler expose /metrics and /healthz on METRICS_PORT (scheduler runs on 9091 locally)
+- API records per-route metrics via middleware

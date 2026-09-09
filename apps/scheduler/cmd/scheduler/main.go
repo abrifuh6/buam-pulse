@@ -8,6 +8,7 @@ import (
 
 	"github.com/abrifuh6/buam-pulse/internal/config"
 	"github.com/abrifuh6/buam-pulse/internal/db"
+	"github.com/abrifuh6/buam-pulse/internal/metrics"
 	"github.com/abrifuh6/buam-pulse/internal/queue"
 )
 
@@ -16,19 +17,27 @@ import (
 // second replica ever runs, they never enqueue the same monitor twice.
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(log)
+
 	cfg, err := config.Load()
 	if err != nil {
-		log.Error("config", "err", err); os.Exit(1)
+		log.Error("config", "err", err)
+		os.Exit(1)
 	}
 	ctx := context.Background()
 	pool, err := db.Connect(ctx, cfg.DatabaseURL)
 	if err != nil {
-		log.Error("db", "err", err); os.Exit(1)
+		log.Error("db", "err", err)
+		os.Exit(1)
 	}
 	q, err := queue.New(cfg.RedisURL)
 	if err != nil {
-		log.Error("redis", "err", err); os.Exit(1)
+		log.Error("redis", "err", err)
+		os.Exit(1)
 	}
+
+	metrics.Serve(":" + cfg.MetricsPort)
+	log.Info("scheduler started", "metrics_port", cfg.MetricsPort)
 
 	const claimSQL = `
 		UPDATE monitors SET next_run_at = now() + (interval_seconds || ' seconds')::interval
@@ -45,7 +54,8 @@ func main() {
 	for range tick.C {
 		rows, err := pool.Query(ctx, claimSQL)
 		if err != nil {
-			log.Error("claim", "err", err); continue
+			log.Error("claim", "err", err)
+			continue
 		}
 		n := 0
 		for rows.Next() {
@@ -57,6 +67,11 @@ func main() {
 			}
 		}
 		rows.Close()
+
+		metrics.Enqueued.Add(float64(n))
+		if depth, err := q.Depth(ctx); err == nil {
+			metrics.QueueDepth.Set(float64(depth))
+		}
 		if n > 0 {
 			log.Info("enqueued", "count", n)
 		}

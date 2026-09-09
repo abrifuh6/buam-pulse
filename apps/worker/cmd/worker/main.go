@@ -10,6 +10,7 @@ import (
 	"github.com/abrifuh6/buam-pulse/internal/config"
 	"github.com/abrifuh6/buam-pulse/internal/db"
 	"github.com/abrifuh6/buam-pulse/internal/queue"
+    "github.com/abrifuh6/buam-pulse/internal/metrics"
 )
 
 // Workers are stateless and scale horizontally: more customers → more
@@ -26,6 +27,9 @@ func main() {
 		log.Error("db", "err", err); os.Exit(1)
 	}
 	q, err := queue.New(cfg.RedisURL)
+		metrics.Serve(":" + cfg.MetricsPort)
+    	log.Info("worker started", "metrics_port", cfg.MetricsPort)
+
 	if err != nil {
 		log.Error("redis", "err", err); os.Exit(1)
 	}
@@ -55,6 +59,13 @@ func main() {
 		} else {
 			res = checks.TCP(ctx, target, timeout)
 		}
+
+        result := "ok"
+        if !res.OK {
+            result = "fail"
+        }
+        metrics.ChecksTotal.WithLabelValues(typ, result).Inc()
+        metrics.CheckLatency.WithLabelValues(typ).Observe(float64(res.LatencyMs) / 1000)
 
 		_, err = pool.Exec(ctx, `
 			INSERT INTO check_results (monitor_id, tenant_id, ok, status_code, latency_ms, error, region)
