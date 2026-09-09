@@ -36,8 +36,8 @@ func (s *Server) Signup(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, "db")
 		return
 	}
-	defer tx.Rollback(r.Context())
-
+	defer func() { _ = tx.Rollback(r.Context()) }()
+	
 	var tenantID, userID string
 	if err := tx.QueryRow(r.Context(),
 		`INSERT INTO tenants (name, slug) VALUES ($1,$2) RETURNING id`, in.Company, slug).Scan(&tenantID); err != nil {

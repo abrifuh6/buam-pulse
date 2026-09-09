@@ -32,7 +32,7 @@ func HTTP(ctx context.Context, url string, expected int, timeout time.Duration) 
 	if err != nil {
 		return Result{LatencyMs: latency, Err: err.Error()}
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	return Result{
 		OK:         resp.StatusCode == expected,
@@ -51,6 +51,7 @@ func TCP(ctx context.Context, hostport string, timeout time.Duration) Result {
 	if err != nil {
 		return Result{LatencyMs: latency, Err: err.Error()}
 	}
-	conn.Close()
-	return Result{OK: true, LatencyMs: latency}
+	_ = conn.Close()
+
+		return Result{OK: true, LatencyMs: latency}
 }
