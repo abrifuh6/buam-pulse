@@ -54,3 +54,4 @@
 - .golangci.yml added
 - Dependencies updated for Trivy findings; toolchain moved to Go 1.26 (go.mod, Dockerfile, CI together)
 - Removed chi RealIP middleware: trusts X-Forwarded-For from any client (GHSA-3fxj-6jh8-hvhx). Client IP handling will be done at the load balancer in Phase 4.
+- CI publishes multi-arch images (linux/amd64 + linux/arm64) via QEMU + buildx; needed for Apple Silicon dev and Graviton nodes
