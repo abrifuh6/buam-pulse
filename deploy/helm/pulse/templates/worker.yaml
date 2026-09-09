@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pulse-worker
+  labels: {{- include "pulse.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  selector: { matchLabels: { app: pulse-worker } }
+  template:
+    metadata:
+      labels: { app: pulse-worker }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ .Values.metricsPort | quote }}
+    spec:
+      securityContext: { runAsNonRoot: true, runAsUser: 65532 }
+      containers:
+        - name: worker
+          image: {{ .Values.image.prefix }}-worker:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            {{- include "pulse.env" . | nindent 12 }}
+            - name: PULSE_REGION
+              value: {{ .Values.worker.region | quote }}
+          ports: [{ containerPort: {{ .Values.metricsPort }}, name: metrics }]
+          livenessProbe:
+            httpGet: { path: /healthz, port: metrics }
+            periodSeconds: 10
+          resources: {{- toYaml .Values.worker.resources | nindent 12 }}

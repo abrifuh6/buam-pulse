@@ -1,0 +1,46 @@
+{{- if .Values.postgres.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pulse-postgres-data
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: { requests: { storage: {{ .Values.postgres.storage }} } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pulse-postgres
+  labels: {{- include "pulse.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy: { type: Recreate }
+  selector: { matchLabels: { app: pulse-postgres } }
+  template:
+    metadata: { labels: { app: pulse-postgres } }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          env:
+            - { name: POSTGRES_USER, value: pulse }
+            - { name: POSTGRES_PASSWORD, value: pulse }
+            - { name: POSTGRES_DB, value: pulse }
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+          ports: [{ containerPort: 5432 }]
+          volumeMounts: [{ name: data, mountPath: /var/lib/postgresql/data }]
+          readinessProbe:
+            exec: { command: [pg_isready, -U, pulse] }
+            periodSeconds: 5
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: pulse-postgres-data }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pulse-postgres
+spec:
+  selector: { app: pulse-postgres }
+  ports: [{ port: 5432 }]
+{{- end }}

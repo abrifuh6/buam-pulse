@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pulse-scheduler
+  labels: {{- include "pulse.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy: { type: Recreate }   # never two schedulers during a rollout
+  selector: { matchLabels: { app: pulse-scheduler } }
+  template:
+    metadata:
+      labels: { app: pulse-scheduler }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ .Values.metricsPort | quote }}
+    spec:
+      securityContext: { runAsNonRoot: true, runAsUser: 65532 }
+      containers:
+        - name: scheduler
+          image: {{ .Values.image.prefix }}-scheduler:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env: {{- include "pulse.env" . | nindent 12 }}
+          ports: [{ containerPort: {{ .Values.metricsPort }}, name: metrics }]
+          livenessProbe:
+            httpGet: { path: /healthz, port: metrics }
+            periodSeconds: 10
+          resources: {{- toYaml .Values.scheduler.resources | nindent 12 }}

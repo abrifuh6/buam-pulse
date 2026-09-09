@@ -1,0 +1,17 @@
+image:
+  pullPolicy: Never   # images are loaded onto nodes with `make kind-load`
+
+api:
+  replicas: 1
+worker:
+  replicas: 2
+
+postgres:
+  enabled: true
+redis:
+  enabled: true
+
+secrets:
+  databaseUrl: postgres://pulse:pulse@pulse-postgres:5432/pulse?sslmode=disable
+  redisUrl: redis://pulse-redis:6379/0
+  jwtSecret: dev-only-secret-change-me
