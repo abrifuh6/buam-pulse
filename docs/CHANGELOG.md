@@ -113,3 +113,11 @@
 - Migration grandfathers existing tenants onto starter so no live data violates a new limit
 - Billing tab: usage bars against plan limits (amber at 80%) and tier comparison
 - Account control in header: GET /account returns tenant, user role, plan, member/monitor counts and the tenant's own status page URL; menu closes on outside click and Escape
+
+## 2026-09-10 — Phase 3.6 step 3: Stripe billing
+- stripe-setup command creates products and prices via the API and stores the price IDs, so the Stripe side is reproducible rather than clicked into a dashboard
+- Checkout for first purchase, billing portal for every subsequent change: card data never touches Pulse
+- Webhook handler verifies signatures and records every event id, making Stripe's retries idempotent by construction
+- Fixed: handlers matched on customer id alone, so cancelling a duplicate subscription revoked a plan the tenant was still paying for. Now scoped to the tracked subscription — see ADR 0006
+- cancel_at_period_end tracked separately from canceled; the UI says access continues until the period ends
+- Debugging notes: CLI was authorized against a different sandbox than the API key (events fired where nothing listened); stripe-go v81 rejects newer account API versions unless IgnoreAPIVersionMismatch is set
