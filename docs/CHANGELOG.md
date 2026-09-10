@@ -80,3 +80,5 @@
 - Config split: APP_URL for verification links, STATUS_URL for status-page links — different origins per ADR 0003
 - Metrics: pulse_notifications_total{channel,kind,outcome}, pulse_notification_backlog
 - Verified: failure → 2 consecutive fails → incident → DOWN email; recovery → incident resolved → RECOVERED email with downtime duration
+- Dashboard: Monitors/Alerts tabs; per-monitor edit, pause and resume (resume schedules an immediate check); channel management with test-send
+- PATCH /monitors/{id}: partial update via nullable fields; monitor type is immutable

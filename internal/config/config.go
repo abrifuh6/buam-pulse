@@ -27,6 +27,9 @@ type Config struct {
 	AlertFrom    string
 	AppURL       string // where the dashboard/API live — verification links
 	StatusURL    string // where public status pages live — alert links
+	// Only true when the API sits behind a proxy we control (the ingress/ALB).
+	// Never true when the API is directly reachable: X-Forwarded-For is spoofable.
+	TrustProxy bool
 }
 
 func Load() (Config, error) {
@@ -46,6 +49,7 @@ func Load() (Config, error) {
 		AlertFrom:    getenv("ALERT_FROM", "alerts@pulse.local"),
 		AppURL:       getenv("APP_URL", "http://localhost:8080"),
 		StatusURL:    getenv("STATUS_URL", "http://localhost:5174"),
+		TrustProxy:   getenv("TRUST_PROXY", "false") == "true",
 	}
 	if c.DatabaseURL == "" || c.RedisURL == "" {
 		return c, fmt.Errorf("DATABASE_URL and REDIS_URL are required")

@@ -4,6 +4,7 @@ package http
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -33,8 +34,16 @@ func (s *Server) Router() http.Handler {
 	r.Handle("/metrics", promhttp.Handler())
 
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Post("/auth/signup", s.Signup)
-		r.Post("/auth/login", s.Login)
+		// Auth endpoints are rate limited by IP: 10 attempts per minute is
+		// generous for humans and useless for brute force.
+		r.Group(func(r chi.Router) {
+			r.Use(NewRateLimiter(10, time.Minute).Middleware(s.Cfg.TrustProxy))
+			r.Post("/auth/signup", s.Signup)
+			r.Post("/auth/login", s.Login)
+			r.Post("/auth/forgot", s.RequestPasswordReset)
+			r.Post("/auth/reset", s.ResetPassword)
+		})
+		r.Get("/auth/verify", s.VerifyUser)
 
 		// Public: the status page is meant to be linked publicly.
 		r.Get("/public/status/{slug}", s.PublicStatus)
