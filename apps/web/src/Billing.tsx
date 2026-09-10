@@ -95,15 +95,6 @@ export default function Billing({ account }: { account: Account | null }) {
         </div>
       )}
 
-      {account?.plan.cancel_at_period_end && (
-        <div className="card" style={{ borderColor: 'var(--muted)' }}>
-          <span className="muted">
-            Your subscription is set to end at the close of the current billing
-            period. You keep {current.plan.name} access until then.
-          </span>
-        </div>
-      )}
-
       {pastDue && (
         <div className="card" style={{ borderColor: 'var(--down)' }}>
           <div className="row">
