@@ -67,6 +67,15 @@ export type PlanUsage = {
   usage: { monitors: number; members: number; channels: number }
 }
 
+
+export type Account = {
+  tenant: { name: string; slug: string }
+  user: { email: string; role: 'owner' | 'admin' | 'member' }
+  plan: { code: string; name: string }
+  counts: { members: number; monitors: number }
+  status_url: string
+}
+
 const TOKEN_KEY = 'pulse.token'
 
 export const token = {
@@ -209,6 +218,8 @@ export const api = {
   currentPlan: () => request<PlanUsage>('/billing/plan'),
 
   listPlans: () => request<Plan[]>('/plans'),
+
+  account: () => request<Account>('/account'),
 
 
 

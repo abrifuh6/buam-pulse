@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api, token, currentRole, type Monitor, type CheckResult } from './api'
+import { api, currentRole, type Monitor, type CheckResult, type Account } from './api'
 import Channels from './Channels'
 import Team from './Team'
 import Billing from './Billing'
+import AccountHeader from './AccountHeader'
 
 function Sparkline({ id, refreshKey }: { id: string; refreshKey: number }) {
   const [results, setResults] = useState<CheckResult[]>([])
@@ -191,6 +192,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
   const canWrite = role === 'owner' || role === 'admin'
   const [monitors, setMonitors] = useState<Monitor[]>([])
   const [refreshKey, setRefreshKey] = useState(0)
+  const [account, setAccount] = useState<Account | null>(null)
   const [err, setErr] = useState('')
 
   const load = useCallback(async () => {
@@ -202,6 +204,10 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
       setErr(e instanceof Error ? e.message : 'failed')
     }
   }, [onLogout])
+
+  useEffect(() => {
+    api.account().then(setAccount).catch(() => {})
+  }, [])
 
   useEffect(() => {
     load()
@@ -244,15 +250,14 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
           >
             Plan
           </button>
-          <button
-            className="ghost"
-            onClick={() => {
-              token.clear()
-              onLogout()
-            }}
-          >
-            Sign out
-          </button>
+          {account && (
+            <AccountHeader
+              account={account}
+              onOpenPlan={() => setTab('billing')}
+              onOpenTeam={() => setTab('team')}
+              onLogout={onLogout}
+            />
+          )}
         </div>
       </header>
 

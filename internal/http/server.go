@@ -64,6 +64,7 @@ func (s *Server) Router() http.Handler {
 			r.Get("/team/members", s.ListMembers)
 			r.Get("/team/invitations", s.ListInvitations)
 			r.Get("/billing/plan", s.CurrentPlan)
+			r.Get("/account", s.GetAccount)
 
 			// Writes: admin and above.
 			r.Group(func(r chi.Router) {
