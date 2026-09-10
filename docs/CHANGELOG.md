@@ -102,3 +102,12 @@
 - Ownership transfer demotes the current owner in the same transaction, so a tenant never has zero or two owners
 - Config split three ways: API_URL for endpoint links, DASHBOARD_URL for links to app pages, STATUS_URL for status pages
 - Known limitation: a role change takes effect only when the user's 24h token is reissued; token versioning is the follow-up
+
+## 2026-09-10 — Phase 3.6 step 2: plan limits
+- plans table holds tiers as data (free/starter/pro); changing a limit is an UPDATE, not a deploy
+- Limits enforced inside a transaction with the tenant row locked, closing the count-then-insert race
+- Interval floor enforced on create AND update, so create-then-edit can't bypass it
+- Pending invitations count toward the member limit
+- 402 Payment Required rather than 403: the action is legitimate, the plan is the obstacle
+- GET /billing/plan (usage) and public GET /plans (pricing)
+- Migration grandfathers existing tenants onto starter so no live data violates a new limit
