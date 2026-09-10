@@ -87,6 +87,8 @@ func (s *Server) Router() http.Handler {
 			// Membership changes: owner only.
 			r.Group(func(r chi.Router) {
 				r.Use(RequireRole("owner"))
+				r.Get("/account/export", s.ExportData)
+				r.Delete("/account", s.DeleteAccount)
 				r.Post("/billing/checkout", s.CreateCheckout)
 				r.Post("/billing/portal", s.CreatePortal)
 				r.Patch("/team/members/{id}", s.ChangeRole)
