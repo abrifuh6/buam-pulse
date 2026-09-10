@@ -50,7 +50,7 @@ func (s *Server) RequestPasswordReset(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			slog.Error("create reset token", "err", err)
 		} else {
-			link := s.Cfg.AppURL + "/reset?token=" + token
+			link := s.Cfg.DashboardURL + "/reset?token=" + token
 			body := "Someone requested a password reset for your Pulse account.\n\n" +
 				"Reset it here (valid for 1 hour): " + link + "\n\n" +
 				"If this wasn't you, ignore this email — your password is unchanged.\n"
@@ -156,7 +156,7 @@ func (s *Server) sendVerification(r *http.Request, userID, email string) {
 		slog.Error("create verify token", "err", err)
 		return
 	}
-	link := s.Cfg.AppURL + "/verify?token=" + token
+	link := s.Cfg.APIURL + "/api/v1/auth/verify?token=" + token
 	body := "Welcome to Pulse.\n\nConfirm your email address: " + link +
 		"\n\nThis link is valid for 48 hours.\n"
 	if err := alerting.SendEmail(s.smtp(), email, "Confirm your Pulse account", body); err != nil {

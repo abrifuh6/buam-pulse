@@ -25,7 +25,11 @@ type Config struct {
 	SMTPUser     string
 	SMTPPassword string
 	AlertFrom    string
-	AppURL       string // where the dashboard/API live — verification links
+	// Three public addresses. In production these collapse onto two hosts
+	// (app.pulse.io serves the dashboard and, under /api, the API), but in dev
+	// they are three ports. Getting one wrong produces emails with dead links.
+	APIURL       string // API base — links the browser follows to an endpoint
+	DashboardURL string // dashboard base — links to a page in the web app
 	StatusURL    string // where public status pages live — alert links
 	// Only true when the API sits behind a proxy we control (the ingress/ALB).
 	// Never true when the API is directly reachable: X-Forwarded-For is spoofable.
@@ -47,7 +51,8 @@ func Load() (Config, error) {
 		SMTPUser:     os.Getenv("SMTP_USER"),
 		SMTPPassword: os.Getenv("SMTP_PASSWORD"),
 		AlertFrom:    getenv("ALERT_FROM", "alerts@pulse.local"),
-		AppURL:       getenv("APP_URL", "http://localhost:8080"),
+		APIURL:       getenv("API_URL", "http://localhost:8080"),
+		DashboardURL: getenv("DASHBOARD_URL", "http://localhost:5173"),
 		StatusURL:    getenv("STATUS_URL", "http://localhost:5174"),
 		TrustProxy:   getenv("TRUST_PROXY", "false") == "true",
 	}

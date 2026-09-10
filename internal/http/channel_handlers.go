@@ -116,7 +116,7 @@ func (s *Server) CreateChannel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if in.Type == "email" {
-		link := s.Cfg.AppURL + "/api/v1/channels/verify?token=" + verifyToken
+		link := s.Cfg.APIURL + "/api/v1/channels/verify?token=" + verifyToken
 		subject := "Confirm alerts to this address"
 		body := "You (or someone at your company) added this address to receive Pulse alerts.\n\n" +
 			"Confirm: " + link + "\n\nIf this wasn't you, ignore this email — no alerts will be sent.\n"

@@ -42,27 +42,48 @@ func (s *Server) Router() http.Handler {
 			r.Post("/auth/login", s.Login)
 			r.Post("/auth/forgot", s.RequestPasswordReset)
 			r.Post("/auth/reset", s.ResetPassword)
+			r.Post("/invitations/accept", s.AcceptInvitation)
 		})
-		r.Get("/auth/verify", s.VerifyUser)
 
-		// Public: the status page is meant to be linked publicly.
-		r.Get("/public/status/{slug}", s.PublicStatus)
-		// Unauthenticated by design: the token in the emailed link is the proof.
+		// Token-gated but unauthenticated: the link itself is the credential.
+		r.Get("/auth/verify", s.VerifyUser)
 		r.Get("/channels/verify", s.VerifyChannel)
+		r.Get("/invitations/info", s.InvitationInfo)
+
+		// Public status pages.
+		r.Get("/public/status/{slug}", s.PublicStatus)
 
 		r.Group(func(r chi.Router) {
 			r.Use(RequireAuth(s.Cfg.JWTSecret))
 
+			// Reads: any member.
 			r.Get("/monitors", s.ListMonitors)
-			r.Post("/monitors", s.CreateMonitor)
-			r.Patch("/monitors/{id}", s.UpdateMonitor)
-			r.Delete("/monitors/{id}", s.DeleteMonitor)
 			r.Get("/monitors/{id}/results", s.MonitorResults)
-
 			r.Get("/channels", s.ListChannels)
-			r.Post("/channels", s.CreateChannel)
-			r.Delete("/channels/{id}", s.DeleteChannel)
-			r.Post("/channels/{id}/test", s.TestChannel)
+			r.Get("/team/members", s.ListMembers)
+			r.Get("/team/invitations", s.ListInvitations)
+
+			// Writes: admin and above.
+			r.Group(func(r chi.Router) {
+				r.Use(RequireRole("admin"))
+				r.Post("/monitors", s.CreateMonitor)
+				r.Patch("/monitors/{id}", s.UpdateMonitor)
+				r.Delete("/monitors/{id}", s.DeleteMonitor)
+
+				r.Post("/channels", s.CreateChannel)
+				r.Delete("/channels/{id}", s.DeleteChannel)
+				r.Post("/channels/{id}/test", s.TestChannel)
+
+				r.Post("/team/invitations", s.InviteMember)
+				r.Delete("/team/invitations/{id}", s.RevokeInvitation)
+			})
+
+			// Membership changes: owner only.
+			r.Group(func(r chi.Router) {
+				r.Use(RequireRole("owner"))
+				r.Patch("/team/members/{id}", s.ChangeRole)
+				r.Delete("/team/members/{id}", s.RemoveMember)
+			})
 		})
 	})
 	return r

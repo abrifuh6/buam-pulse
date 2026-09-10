@@ -9,11 +9,11 @@ func TestValidateTargetRejectsPrivate(t *testing.T) {
 		"http://10.0.0.5/health",
 		"http://192.168.1.1",
 		"http://172.16.0.1",
-		"http://169.254.169.254/latest/meta-data/",  // cloud metadata
+		"http://169.254.169.254/latest/meta-data/", // cloud metadata
 		"http://[::1]/",
-		"http://100.100.100.100/",                    // CGNAT
+		"http://100.100.100.100/", // CGNAT
 		"http://api.internal/health",
-		"www.example.com",                            // no scheme
+		"www.example.com", // no scheme
 		"ftp://example.com",
 	}
 	for _, target := range bad {

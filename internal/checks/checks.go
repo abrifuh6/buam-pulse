@@ -53,5 +53,5 @@ func TCP(ctx context.Context, hostport string, timeout time.Duration) Result {
 	}
 	_ = conn.Close()
 
-		return Result{OK: true, LatencyMs: latency}
+	return Result{OK: true, LatencyMs: latency}
 }

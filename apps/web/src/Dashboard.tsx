@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api, token, type Monitor, type CheckResult } from './api'
+import { api, token, currentRole, type Monitor, type CheckResult } from './api'
 import Channels from './Channels'
+import Team from './Team'
 
 function Sparkline({ id, refreshKey }: { id: string; refreshKey: number }) {
   const [results, setResults] = useState<CheckResult[]>([])
@@ -93,10 +94,12 @@ function AddMonitor({ onAdded }: { onAdded: () => void }) {
 function MonitorRow({
   m,
   refreshKey,
+  canWrite,
   onChanged,
 }: {
   m: Monitor
   refreshKey: number
+  canWrite: boolean
   onChanged: () => void
 }) {
   const [editing, setEditing] = useState(false)
@@ -163,22 +166,28 @@ function MonitorRow({
         </div>
         {m.enabled && <Sparkline id={m.id} refreshKey={refreshKey} />}
         <span className="metric">{m.interval_seconds}s</span>
-        <button className="ghost" onClick={() => setEditing(true)}>
-          Edit
-        </button>
-        <button className="ghost" onClick={togglePause}>
-          {m.enabled ? 'Pause' : 'Resume'}
-        </button>
-        <button className="ghost" onClick={remove}>
-          Delete
-        </button>
+        {canWrite && (
+          <>
+            <button className="ghost" onClick={() => setEditing(true)}>
+              Edit
+            </button>
+            <button className="ghost" onClick={togglePause}>
+              {m.enabled ? 'Pause' : 'Resume'}
+            </button>
+            <button className="ghost" onClick={remove}>
+              Delete
+            </button>
+          </>
+        )}
       </div>
     </div>
   )
 }
 
 export default function Dashboard({ onLogout }: { onLogout: () => void }) {
-  const [tab, setTab] = useState<'monitors' | 'channels'>('monitors')
+  const [tab, setTab] = useState<'monitors' | 'channels' | 'team'>('monitors')
+  const role = currentRole()
+  const canWrite = role === 'owner' || role === 'admin'
   const [monitors, setMonitors] = useState<Monitor[]>([])
   const [refreshKey, setRefreshKey] = useState(0)
   const [err, setErr] = useState('')
@@ -222,6 +231,13 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
           </button>
           <button
             className="ghost"
+            onClick={() => setTab('team')}
+            style={{ color: tab === 'team' ? 'var(--text)' : undefined }}
+          >
+            Team
+          </button>
+          <button
+            className="ghost"
             onClick={() => {
               token.clear()
               onLogout()
@@ -232,15 +248,23 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
         </div>
       </header>
 
-      {tab === 'monitors' ? (
+      {tab === 'team' ? (
+        <Team />
+      ) : tab === 'monitors' ? (
         <>
-          <AddMonitor onAdded={load} />
+          {canWrite && <AddMonitor onAdded={load} />}
           {err && <p className="err">{err}</p>}
           {!monitors.length && !err && (
             <p className="muted">No monitors yet. Add your first one above.</p>
           )}
           {monitors.map((m) => (
-            <MonitorRow key={m.id} m={m} refreshKey={refreshKey} onChanged={load} />
+            <MonitorRow
+              key={m.id}
+              m={m}
+              refreshKey={refreshKey}
+              canWrite={canWrite}
+              onChanged={load}
+            />
           ))}
         </>
       ) : (

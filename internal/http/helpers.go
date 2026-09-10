@@ -17,5 +17,5 @@ func writeErr(w http.ResponseWriter, status int, msg string) {
 
 func decode(r *http.Request, v any) error {
 	defer func() { _ = r.Body.Close() }()
-    return json.NewDecoder(http.MaxBytesReader(nil, r.Body, 1<<20)).Decode(v)
+	return json.NewDecoder(http.MaxBytesReader(nil, r.Body, 1<<20)).Decode(v)
 }

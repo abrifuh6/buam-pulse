@@ -33,12 +33,45 @@ export type Channel = {
   verified: boolean
 }
 
+
+export type Member = {
+  id: string
+  email: string
+  role: 'owner' | 'admin' | 'member'
+  verified: boolean
+  joined_at: string
+  is_you: boolean
+}
+
+export type Invitation = {
+  id: string
+  email: string
+  role: string
+  expires_at: string
+}
+
 const TOKEN_KEY = 'pulse.token'
 
 export const token = {
   get: () => localStorage.getItem(TOKEN_KEY),
   set: (t: string) => localStorage.setItem(TOKEN_KEY, t),
   clear: () => localStorage.removeItem(TOKEN_KEY),
+}
+
+
+// The JWT payload carries the role. Reading it client-side is only for showing
+// or hiding UI — the server enforces permissions regardless of what the browser
+// believes, because a token's contents are visible but its signature is not
+// forgeable.
+export function currentRole(): 'owner' | 'admin' | 'member' | null {
+  const t = token.get()
+  if (!t) return null
+  try {
+    const payload = JSON.parse(atob(t.split('.')[1]))
+    return payload.role ?? null
+  } catch {
+    return null
+  }
 }
 
 class ApiError extends Error {
@@ -123,6 +156,39 @@ export const api = {
 
   testChannel: (id: string) =>
     request<{ status: string }>(`/channels/${id}/test`, { method: 'POST' }),
+
+  listMembers: () => request<Member[]>('/team/members'),
+
+  listInvitations: () => request<Invitation[]>('/team/invitations'),
+
+  invite: (email: string, role: string) =>
+    request<{ status: string }>('/team/invitations', {
+      method: 'POST',
+      body: JSON.stringify({ email, role }),
+    }),
+
+  revokeInvitation: (id: string) =>
+    request<void>(`/team/invitations/${id}`, { method: 'DELETE' }),
+
+  changeRole: (id: string, role: string) =>
+    request<{ status: string }>(`/team/members/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+    }),
+
+  removeMember: (id: string) => request<void>(`/team/members/${id}`, { method: 'DELETE' }),
+
+  invitationInfo: (token: string) =>
+    request<{ tenant: string; email: string; role: string }>(
+      `/invitations/info?token=${encodeURIComponent(token)}`,
+    ),
+
+  acceptInvitation: (token: string, password: string) =>
+    request<{ token: string }>('/invitations/accept', {
+      method: 'POST',
+      body: JSON.stringify({ token, password }),
+    }),
+
 
 }
 
