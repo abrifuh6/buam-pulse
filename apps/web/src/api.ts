@@ -23,6 +23,16 @@ export type CheckResult = {
   region: string
 }
 
+
+export type Channel = {
+  id: string
+  name: string
+  type: 'email' | 'slack'
+  config: Record<string, string>
+  enabled: boolean
+  verified: boolean
+}
+
 const TOKEN_KEY = 'pulse.token'
 
 export const token = {
@@ -86,6 +96,34 @@ export const api = {
     request<void>(`/monitors/${id}`, { method: 'DELETE' }),
 
   results: (id: string) => request<CheckResult[]>(`/monitors/${id}/results`),
+  updateMonitor: (
+    id: string,
+    patch: Partial<{
+      name: string
+      target: string
+      interval_seconds: number
+      enabled: boolean
+    }>,
+  ) => request<void>(`/monitors/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+
+  listChannels: () => request<Channel[]>('/channels'),
+
+  createChannel: (c: {
+    name: string
+    type: string
+    address?: string
+    webhook_url?: string
+  }) =>
+    request<{ id: string; verification_sent: boolean }>('/channels', {
+      method: 'POST',
+      body: JSON.stringify(c),
+    }),
+
+  deleteChannel: (id: string) => request<void>(`/channels/${id}`, { method: 'DELETE' }),
+
+  testChannel: (id: string) =>
+    request<{ status: string }>(`/channels/${id}/test`, { method: 'POST' }),
+
 }
 
 export { ApiError }

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, token, type Monitor, type CheckResult } from './api'
+import Channels from './Channels'
 
-function Sparkline({ id }: { id: string }) {
+function Sparkline({ id, refreshKey }: { id: string; refreshKey: number }) {
   const [results, setResults] = useState<CheckResult[]>([])
 
   useEffect(() => {
@@ -13,11 +14,10 @@ function Sparkline({ id }: { id: string }) {
     return () => {
       alive = false
     }
-  }, [id])
+  }, [id, refreshKey])
 
   if (!results.length) return <span className="metric">no data</span>
 
-  // Distinguish "nothing recorded yet" from "every check is erroring".
   const lastErr = results[results.length - 1]?.error
   if (lastErr)
     return (
@@ -90,31 +90,114 @@ function AddMonitor({ onAdded }: { onAdded: () => void }) {
   )
 }
 
+function MonitorRow({
+  m,
+  refreshKey,
+  onChanged,
+}: {
+  m: Monitor
+  refreshKey: number
+  onChanged: () => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [name, setName] = useState(m.name)
+  const [target, setTarget] = useState(m.target)
+  const [interval, setInterval] = useState(m.interval_seconds)
+  const [err, setErr] = useState('')
+
+  async function save() {
+    setErr('')
+    try {
+      await api.updateMonitor(m.id, { name, target, interval_seconds: interval })
+      setEditing(false)
+      onChanged()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'failed')
+    }
+  }
+
+  async function togglePause() {
+    await api.updateMonitor(m.id, { enabled: !m.enabled })
+    onChanged()
+  }
+
+  async function remove() {
+    if (!confirm(`Delete monitor "${m.name}"?`)) return
+    await api.deleteMonitor(m.id)
+    onChanged()
+  }
+
+  if (editing)
+    return (
+      <div className="card">
+        <div className="form-grid">
+          <input value={name} onChange={(e) => setName(e.target.value)} />
+          <span className="metric">{m.type.toUpperCase()}</span>
+          <input value={target} onChange={(e) => setTarget(e.target.value)} />
+          <select value={interval} onChange={(e) => setInterval(Number(e.target.value))}>
+            <option value={30}>30s</option>
+            <option value={60}>60s</option>
+            <option value={300}>5m</option>
+          </select>
+          <button onClick={save}>Save</button>
+        </div>
+        <div style={{ marginTop: 10 }}>
+          <button className="ghost" onClick={() => setEditing(false)}>
+            Cancel
+          </button>
+        </div>
+        {err && <p className="err">{err}</p>}
+      </div>
+    )
+
+  return (
+    <div className="card" style={{ opacity: m.enabled ? 1 : 0.55 }}>
+      <div className="row">
+        <span className={`dot ${m.enabled ? m.status : 'unknown'}`} title={m.status} />
+        <div className="grow">
+          <div className="name">
+            {m.name}
+            {!m.enabled && <span className="metric"> · paused</span>}
+          </div>
+          <div className="target">{m.target}</div>
+        </div>
+        {m.enabled && <Sparkline id={m.id} refreshKey={refreshKey} />}
+        <span className="metric">{m.interval_seconds}s</span>
+        <button className="ghost" onClick={() => setEditing(true)}>
+          Edit
+        </button>
+        <button className="ghost" onClick={togglePause}>
+          {m.enabled ? 'Pause' : 'Resume'}
+        </button>
+        <button className="ghost" onClick={remove}>
+          Delete
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function Dashboard({ onLogout }: { onLogout: () => void }) {
+  const [tab, setTab] = useState<'monitors' | 'channels'>('monitors')
   const [monitors, setMonitors] = useState<Monitor[]>([])
+  const [refreshKey, setRefreshKey] = useState(0)
   const [err, setErr] = useState('')
 
   const load = useCallback(async () => {
     try {
       setMonitors(await api.listMonitors())
+      setRefreshKey((k) => k + 1)
     } catch (e) {
       if (e instanceof Error && e.message === 'session expired') return onLogout()
       setErr(e instanceof Error ? e.message : 'failed')
     }
   }, [onLogout])
 
-  // Poll every 15s so the page reflects check results without a reload.
   useEffect(() => {
     load()
     const t = window.setInterval(load, 15000)
     return () => window.clearInterval(t)
   }, [load])
-
-  async function remove(id: string, name: string) {
-    if (!confirm(`Delete monitor "${name}"?`)) return
-    await api.deleteMonitor(id)
-    load()
-  }
 
   return (
     <div className="wrap">
@@ -122,40 +205,47 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
         <h1 className="brand">
           Pulse <small>by Buam Technologies</small>
         </h1>
-        <button
-          className="ghost"
-          onClick={() => {
-            token.clear()
-            onLogout()
-          }}
-        >
-          Sign out
-        </button>
+        <div className="row">
+          <button
+            className="ghost"
+            onClick={() => setTab('monitors')}
+            style={{ color: tab === 'monitors' ? 'var(--text)' : undefined }}
+          >
+            Monitors
+          </button>
+          <button
+            className="ghost"
+            onClick={() => setTab('channels')}
+            style={{ color: tab === 'channels' ? 'var(--text)' : undefined }}
+          >
+            Alerts
+          </button>
+          <button
+            className="ghost"
+            onClick={() => {
+              token.clear()
+              onLogout()
+            }}
+          >
+            Sign out
+          </button>
+        </div>
       </header>
 
-      <AddMonitor onAdded={load} />
-
-      {err && <p className="err">{err}</p>}
-      {!monitors.length && !err && (
-        <p className="muted">No monitors yet. Add your first one above.</p>
+      {tab === 'monitors' ? (
+        <>
+          <AddMonitor onAdded={load} />
+          {err && <p className="err">{err}</p>}
+          {!monitors.length && !err && (
+            <p className="muted">No monitors yet. Add your first one above.</p>
+          )}
+          {monitors.map((m) => (
+            <MonitorRow key={m.id} m={m} refreshKey={refreshKey} onChanged={load} />
+          ))}
+        </>
+      ) : (
+        <Channels />
       )}
-
-      {monitors.map((m) => (
-        <div className="card" key={m.id}>
-          <div className="row">
-            <span className={`dot ${m.status}`} title={m.status} />
-            <div className="grow">
-              <div className="name">{m.name}</div>
-              <div className="target">{m.target}</div>
-            </div>
-            <Sparkline id={m.id} />
-            <span className="metric">{m.interval_seconds}s</span>
-            <button className="ghost" onClick={() => remove(m.id, m.name)}>
-              Delete
-            </button>
-          </div>
-        </div>
-      ))}
     </div>
   )
 }

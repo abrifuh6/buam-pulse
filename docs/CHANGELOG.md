@@ -73,3 +73,10 @@
 - Migration 000002: alert channel verification, monitor→channel routing, notifications table with per-attempt state and UNIQUE(incident, channel, kind) idempotency
 - internal/checks/validate.go: rejects loopback, private, link-local, CGNAT and cloud-metadata targets at creation; ResolveGuard re-checks DNS at check time (rebinding defence)
 - Mailpit added to docker-compose for local mail (arm64-native); SMTP settings via env so SES drops in for stage/prod
+## 2026-09-10 — Phase 3.5 step 2: alerting works end to end
+- internal/alerting: incident open/close in one transaction with a row lock; notifications queued per channel
+- apps/notifier: separate service draining the queue with exponential backoff (1→32 min) and a dead state after 6 attempts
+- Alert channels API: email (with mandatory verification) and Slack (https hooks.slack.com only); webhook URLs masked when read back; per-channel test endpoint
+- Config split: APP_URL for verification links, STATUS_URL for status-page links — different origins per ADR 0003
+- Metrics: pulse_notifications_total{channel,kind,outcome}, pulse_notification_backlog
+- Verified: failure → 2 consecutive fails → incident → DOWN email; recovery → incident resolved → RECOVERED email with downtime duration

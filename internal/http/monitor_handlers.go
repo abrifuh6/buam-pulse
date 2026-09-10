@@ -1,6 +1,7 @@
 package http
 
 import (
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -133,4 +134,69 @@ func (s *Server) MonitorResults(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, 200, out)
+}
+
+type monitorUpdateReq struct {
+	Name            *string `json:"name"`
+	Target          *string `json:"target"`
+	IntervalSeconds *int    `json:"interval_seconds"`
+	TimeoutSeconds  *int    `json:"timeout_seconds"`
+	ExpectedStatus  *int    `json:"expected_status"`
+	Enabled         *bool   `json:"enabled"`
+}
+
+// UpdateMonitor is a partial update: pointer fields distinguish "not supplied"
+// from "supplied as zero". Type is deliberately immutable — changing http↔tcp
+// would invalidate the target and the historical results.
+func (s *Server) UpdateMonitor(w http.ResponseWriter, r *http.Request) {
+	c := claimsFrom(r)
+	id := chi.URLParam(r, "id")
+
+	var in monitorUpdateReq
+	if err := decode(r, &in); err != nil {
+		writeErr(w, 400, "bad request")
+		return
+	}
+
+	var currentType string
+	if err := s.DB.QueryRow(r.Context(),
+		`SELECT type FROM monitors WHERE id=$1 AND tenant_id=$2`, id, c.TenantID).
+		Scan(&currentType); err != nil {
+		writeErr(w, 404, "not found")
+		return
+	}
+
+	if in.Target != nil {
+		if err := checks.ValidateTarget(currentType, *in.Target); err != nil {
+			writeErr(w, 400, err.Error())
+			return
+		}
+	}
+
+	// COALESCE keeps the existing value wherever the caller sent null.
+	// Re-enabling schedules an immediate check rather than waiting a full
+	// interval, so the user sees the effect of un-pausing straight away.
+	tag, err := s.DB.Exec(r.Context(), `
+		UPDATE monitors SET
+		  name             = COALESCE($3, name),
+		  target           = COALESCE($4, target),
+		  interval_seconds = COALESCE($5, interval_seconds),
+		  timeout_seconds  = COALESCE($6, timeout_seconds),
+		  expected_status  = COALESCE($7, expected_status),
+		  enabled          = COALESCE($8, enabled),
+		  next_run_at      = CASE WHEN $8 IS TRUE AND NOT enabled THEN now() ELSE next_run_at END,
+		  updated_at       = now()
+		WHERE id=$1 AND tenant_id=$2`,
+		id, c.TenantID, in.Name, in.Target, in.IntervalSeconds,
+		in.TimeoutSeconds, in.ExpectedStatus, in.Enabled)
+	if err != nil {
+		slog.Error("update monitor", "err", err)
+		writeErr(w, 400, "could not update monitor (interval must be 30–3600s)")
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		writeErr(w, 404, "not found")
+		return
+	}
+	w.WriteHeader(204)
 }

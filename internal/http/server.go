@@ -46,6 +46,7 @@ func (s *Server) Router() http.Handler {
 
 			r.Get("/monitors", s.ListMonitors)
 			r.Post("/monitors", s.CreateMonitor)
+			r.Patch("/monitors/{id}", s.UpdateMonitor)
 			r.Delete("/monitors/{id}", s.DeleteMonitor)
 			r.Get("/monitors/{id}/results", s.MonitorResults)
 
