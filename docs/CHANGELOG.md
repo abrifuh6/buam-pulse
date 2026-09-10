@@ -61,3 +61,9 @@
 - apps/web: Vite + React + TypeScript dashboard — signup/login, monitor list with status dot, latency sparkline (last 30 checks), add/delete, 15s polling
 - Vite dev proxy sends /api to :8080 so dev is same-origin, matching the planned production routing
 - Token in localStorage with Bearer header; ADR 0003 records the plan to move to HttpOnly cookies
+
+
+## 2026-09-09 — Phase 3 step 4: public status page
+- apps/status: standalone React app on :5174, reads /api/v1/public/status/{slug}, no auth
+- Light theme, overall banner (all operational / N down / pending), per-service uptime and average latency, 60s refresh
+- Deliberately a separate origin from the dashboard; slug comes from the URL path
