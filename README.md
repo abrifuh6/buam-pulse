@@ -142,3 +142,22 @@ curl -s localhost:9090/metrics | grep ^pulse_
 ## CI/CD
 
 Every push runs `.github/workflows/ci.yml`: static checks and tests, then a parallel build of the four service images, a Trivy vulnerability scan, and — on `main` only — a push to `ghcr.io/abrifuh6/pulse-*` and `docker.io/buamtech/pulse-*`, tagged by git SHA.
+## Reaching the dev cluster in a browser
+
+Docker Desktop's Kubernetes nodes don't publish port 80 to the host, so forward
+the ingress controller in its own terminal tab:
+
+```bash
+make ingress-forward     # sudo; keep this tab open
+```
+
+Then:
+
+| App | URL |
+|-----|-----|
+| Dashboard + API | http://pulse.localtest.me |
+| Status page | http://status.localtest.me/\&lt\;tenant-slug\&gt\; |
+
+`localtest.me` is a public domain whose records all point at 127.0.0.1, so no
+/etc/hosts editing is needed. In EKS this forward disappears — the ingress sits
+behind a real load balancer with real DNS.

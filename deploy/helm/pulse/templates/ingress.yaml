@@ -1,0 +1,44 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pulse
+  labels: {{- include "pulse.labels" . | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    # Dashboard host: /api/* goes to the API, everything else to the SPA.
+    # Order matters — the more specific prefix must come first.
+    - host: {{ .Values.ingress.appHost }}
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: pulse-api
+                port: { name: http }
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pulse-web
+                port: { name: http }
+
+    # Status pages: separate host, same split (the SPA calls /api/v1/public/*).
+    - host: {{ .Values.ingress.statusHost }}
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: pulse-api
+                port: { name: http }
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pulse-status
+                port: { name: http }
+{{- end }}

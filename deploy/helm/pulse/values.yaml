@@ -36,3 +36,22 @@ secrets:
   databaseUrl: ""
   redisUrl: ""
   jwtSecret: ""
+
+web:
+  replicas: 2
+  resources:
+    requests: { cpu: 10m, memory: 24Mi }
+    limits:   { memory: 64Mi }
+
+status:
+  replicas: 2
+  resources:
+    requests: { cpu: 10m, memory: 24Mi }
+    limits:   { memory: 64Mi }
+
+# Ingress: same origin for dashboard + API, separate host for status pages.
+ingress:
+  enabled: false
+  className: nginx
+  appHost: pulse.localtest.me
+  statusHost: status.localtest.me

@@ -1,0 +1,39 @@
+{{- range $name := (list "web" "status") }}
+{{- $cfg := index $.Values $name }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pulse-{{ $name }}
+  labels: {{- include "pulse.labels" $ | nindent 4 }}
+spec:
+  replicas: {{ $cfg.replicas }}
+  selector: { matchLabels: { app: pulse-{{ $name }} } }
+  template:
+    metadata:
+      labels: { app: pulse-{{ $name }} }
+    spec:
+      # nginx:alpine declares USER by name; Kubernetes needs a numeric UID to
+      # verify runAsNonRoot, so state it explicitly (101 = nginx in that image).
+      securityContext: { runAsNonRoot: true, runAsUser: 101, runAsGroup: 101 }
+      containers:
+        - name: {{ $name }}
+          image: {{ $.Values.image.prefix }}-{{ $name }}:{{ $.Values.image.tag }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          ports: [{ containerPort: 8080, name: http }]
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+          resources: {{- toYaml $cfg.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pulse-{{ $name }}
+spec:
+  selector: { app: pulse-{{ $name }} }
+  ports: [{ port: 80, targetPort: http, name: http }]
+{{- end }}

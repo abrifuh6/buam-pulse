@@ -15,3 +15,11 @@ secrets:
   databaseUrl: postgres://pulse:pulse@pulse-postgres:5432/pulse?sslmode=disable
   redisUrl: redis://pulse-redis:6379/0
   jwtSecret: dev-only-secret-change-me
+
+web:
+  replicas: 1
+status:
+  replicas: 1
+
+ingress:
+  enabled: true

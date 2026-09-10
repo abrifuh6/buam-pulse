@@ -32,8 +32,12 @@ export const token = {
 }
 
 class ApiError extends Error {
-  constructor(public status: number, message: string) {
+  // Declared explicitly rather than as a constructor parameter property:
+  // parameter properties emit runtime code, which erasableSyntaxOnly forbids.
+  status: number
+  constructor(status: number, message: string) {
     super(message)
+    this.status = status
   }
 }
 

@@ -40,6 +40,7 @@ lint:
 IMAGE_PREFIX ?= pulse
 TAG ?= dev
 SERVICES = api scheduler worker migrate
+ALL_IMAGES = api scheduler worker migrate web status
 
 docker-build:  ## build all service images
 	@for s in $(SERVICES); do \
@@ -51,16 +52,26 @@ docker-build:  ## build all service images
 KIND_CLUSTER ?= desktop
 
 kind-load:     ## push local images into the Docker Desktop cluster nodes
-	@for s in $(SERVICES); do kind load docker-image $(IMAGE_PREFIX)-$$s:$(TAG) --name $(KIND_CLUSTER); done
+	@for s in $(ALL_IMAGES); do kind load docker-image $(IMAGE_PREFIX)-$$s:$(TAG) --name $(KIND_CLUSTER); done
 
 
 NS ?= pulse-dev
 
 deploy-dev:    ## build, load, and helm install/upgrade into the dev cluster
-	$(MAKE) docker-build kind-load
+	$(MAKE) docker-build docker-build-web kind-load
 	helm upgrade --install pulse deploy/helm/pulse -n $(NS) --create-namespace \
 	  -f deploy/helm/pulse/values-dev.yaml --wait --timeout 3m
 	kubectl get pods -n $(NS)
 
 undeploy-dev:
 	helm uninstall pulse -n $(NS)
+
+
+WEB_APPS = web status
+
+docker-build-web:  ## build the two frontend images
+	@for a in $(WEB_APPS); do \
+	  docker build -f Dockerfile.web --build-arg APP=$$a -t $(IMAGE_PREFIX)-$$a:$(TAG) . || exit 1; \
+	done
+ingress-forward:  ## expose the dev ingress on localhost:80 (needs sudo; runs in foreground)
+	sudo kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 80:80

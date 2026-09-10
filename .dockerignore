@@ -1,6 +1,8 @@
 .git
 .env
 docs
-deploy
+deploy/helm
 infra
 *.md
+**/node_modules
+**/dist
