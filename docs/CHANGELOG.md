@@ -111,3 +111,5 @@
 - 402 Payment Required rather than 403: the action is legitimate, the plan is the obstacle
 - GET /billing/plan (usage) and public GET /plans (pricing)
 - Migration grandfathers existing tenants onto starter so no live data violates a new limit
+- Billing tab: usage bars against plan limits (amber at 80%) and tier comparison
+- Account control in header: GET /account returns tenant, user role, plan, member/monitor counts and the tenant's own status page URL; menu closes on outside click and Escape
