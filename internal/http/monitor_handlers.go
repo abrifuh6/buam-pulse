@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -63,6 +64,16 @@ func (s *Server) CreateMonitor(w http.ResponseWriter, r *http.Request) {
 	if in.Type != "http" && in.Type != "tcp" {
 		writeErr(w, 400, "type must be http or tcp")
 		return
+	}
+	// A bare hostname ("www.example.com") produces a permanently failing
+	// monitor, so reject it at creation time rather than let the user find out
+	// from a red dot.
+	if in.Type == "http" {
+		u, perr := url.Parse(in.Target)
+		if perr != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			writeErr(w, 400, "http target must be a full URL, e.g. https://example.com")
+			return
+		}
 	}
 	if in.IntervalSeconds == 0 {
 		in.IntervalSeconds = 60

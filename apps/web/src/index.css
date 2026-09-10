@@ -1,0 +1,59 @@
+:root {
+  --bg: #0f1115;
+  --panel: #171a21;
+  --border: #262b36;
+  --text: #e6e8eb;
+  --muted: #8b929f;
+  --up: #2ea043;
+  --down: #e5534b;
+  --unknown: #8b929f;
+  --accent: #3b82f6;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); }
+
+.wrap { max-width: 880px; margin: 0 auto; padding: 32px 20px; }
+header.top { display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 28px; }
+h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+.brand small { color: var(--muted); font-weight: 400; margin-left: 8px; }
+
+.card { background: var(--panel); border: 1px solid var(--border);
+  border-radius: 10px; padding: 18px; margin-bottom: 14px; }
+
+.row { display: flex; align-items: center; gap: 14px; }
+.row .grow { flex: 1; min-width: 0; }
+.name { font-weight: 600; }
+.target { color: var(--muted); font-size: 13px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+
+.dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.dot.up { background: var(--up); }
+.dot.down { background: var(--down); }
+.dot.unknown { background: var(--unknown); }
+
+.metric { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
+
+input, select, button { font: inherit; }
+input, select { background: #0d0f13; color: var(--text);
+  border: 1px solid var(--border); border-radius: 7px; padding: 9px 11px; }
+input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+button { background: var(--accent); color: #fff; border: 0; border-radius: 7px;
+  padding: 9px 15px; cursor: pointer; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+button.ghost { background: transparent; color: var(--muted);
+  border: 1px solid var(--border); }
+button.ghost:hover { color: var(--text); }
+
+.form-grid { display: grid; grid-template-columns: 2fr 1fr 3fr auto auto;
+  gap: 10px; align-items: center; }
+.err { color: var(--down); font-size: 13px; margin: 10px 0 0; }
+.muted { color: var(--muted); }
+.center { max-width: 340px; margin: 12vh auto; }
+.stack { display: flex; flex-direction: column; gap: 10px; }
+.spark { display: flex; gap: 2px; align-items: flex-end; height: 22px; }
+.spark i { width: 3px; background: var(--up); border-radius: 1px; display: block; }
+.spark i.bad { background: var(--down); }

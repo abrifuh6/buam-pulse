@@ -55,3 +55,9 @@
 - Dependencies updated for Trivy findings; toolchain moved to Go 1.26 (go.mod, Dockerfile, CI together)
 - Removed chi RealIP middleware: trusts X-Forwarded-For from any client (GHSA-3fxj-6jh8-hvhx). Client IP handling will be done at the load balancer in Phase 4.
 - CI publishes multi-arch images (linux/amd64 + linux/arm64) via QEMU + buildx; needed for Apple Silicon dev and Graviton nodes
+
+
+## 2026-09-09 — Phase 3 step 3: React dashboard
+- apps/web: Vite + React + TypeScript dashboard — signup/login, monitor list with status dot, latency sparkline (last 30 checks), add/delete, 15s polling
+- Vite dev proxy sends /api to :8080 so dev is same-origin, matching the planned production routing
+- Token in localStorage with Bearer header; ADR 0003 records the plan to move to HttpOnly cookies

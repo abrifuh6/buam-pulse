@@ -1,0 +1,87 @@
+// One place that knows how to talk to the API. Every call goes to a relative
+// /api path, so the browser treats it as same-origin.
+
+export type Monitor = {
+  id: string
+  name: string
+  type: 'http' | 'tcp'
+  target: string
+  interval_seconds: number
+  timeout_seconds: number
+  expected_status?: number
+  enabled: boolean
+  status: 'up' | 'down' | 'unknown'
+  created_at: string
+}
+
+export type CheckResult = {
+  checked_at: string
+  ok: boolean
+  status_code: number | null
+  latency_ms: number | null
+  error: string | null
+  region: string
+}
+
+const TOKEN_KEY = 'pulse.token'
+
+export const token = {
+  get: () => localStorage.getItem(TOKEN_KEY),
+  set: (t: string) => localStorage.setItem(TOKEN_KEY, t),
+  clear: () => localStorage.removeItem(TOKEN_KEY),
+}
+
+class ApiError extends Error {
+  constructor(public status: number, message: string) {
+    super(message)
+  }
+}
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const headers = new Headers(init.headers)
+  headers.set('Content-Type', 'application/json')
+  const t = token.get()
+  if (t) headers.set('Authorization', `Bearer ${t}`)
+
+  const res = await fetch(`/api/v1${path}`, { ...init, headers })
+
+  if (res.status === 401) {
+    token.clear()
+    throw new ApiError(401, 'session expired')
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }))
+    throw new ApiError(res.status, body.error ?? 'request failed')
+  }
+  return res.status === 204 ? (undefined as T) : res.json()
+}
+
+export const api = {
+  signup: (company: string, email: string, password: string) =>
+    request<{ token: string; slug: string }>('/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify({ company, email, password }),
+    }),
+
+  login: (email: string, password: string) =>
+    request<{ token: string }>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    }),
+
+  listMonitors: () => request<Monitor[]>('/monitors'),
+
+  createMonitor: (m: {
+    name: string
+    type: string
+    target: string
+    interval_seconds: number
+  }) => request<{ id: string }>('/monitors', { method: 'POST', body: JSON.stringify(m) }),
+
+  deleteMonitor: (id: string) =>
+    request<void>(`/monitors/${id}`, { method: 'DELETE' }),
+
+  results: (id: string) => request<CheckResult[]>(`/monitors/${id}/results`),
+}
+
+export { ApiError }
