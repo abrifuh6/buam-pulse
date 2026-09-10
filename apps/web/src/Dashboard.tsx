@@ -262,7 +262,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
       </header>
 
       {tab === 'billing' ? (
-        <Billing />
+        <Billing account={account} />
       ) : tab === 'team' ? (
         <Team />
       ) : tab === 'monitors' ? (

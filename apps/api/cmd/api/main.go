@@ -12,6 +12,7 @@ import (
 	"github.com/abrifuh6/buam-pulse/internal/config"
 	"github.com/abrifuh6/buam-pulse/internal/db"
 	api "github.com/abrifuh6/buam-pulse/internal/http"
+	"github.com/stripe/stripe-go/v81"
 )
 
 func main() {
@@ -34,6 +35,11 @@ func main() {
 		os.Exit(1)
 	}
 	defer pool.Close()
+
+	// Package-level API key for the Stripe SDK. Empty in environments without
+	// billing configured; the billing endpoints then fail loudly rather than
+	// silently charging nothing.
+	stripe.Key = cfg.StripeSecretKey
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.APIPort,

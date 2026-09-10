@@ -1,7 +1,7 @@
 include .env
 export
 
-.PHONY: doctor up down migrate-up migrate-down run-api run-scheduler run-worker test lint docker-build
+.PHONY: doctor stripe-setup up down migrate-up migrate-down run-api run-scheduler run-worker test lint docker-build
 
 doctor:        ## verify required tools are installed
 	@for t in docker go migrate; do \
@@ -78,3 +78,6 @@ ingress-forward:  ## expose the dev ingress on localhost:80 (needs sudo; runs in
 
 run-notifier:
 	METRICS_PORT=9092 go run ./apps/notifier/cmd/notifier
+
+stripe-setup:  ## create Stripe products/prices and store their IDs
+	go run ./apps/stripe-setup/cmd/stripe-setup

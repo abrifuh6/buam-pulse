@@ -53,6 +53,9 @@ func (s *Server) Router() http.Handler {
 		// Public status pages.
 		r.Get("/public/status/{slug}", s.PublicStatus)
 		r.Get("/plans", s.ListPlans)
+		// Stripe calls this; there is no user session. The signature header is
+		// the authentication.
+		r.Post("/billing/webhook", s.StripeWebhook)
 
 		r.Group(func(r chi.Router) {
 			r.Use(RequireAuth(s.Cfg.JWTSecret))
@@ -84,6 +87,8 @@ func (s *Server) Router() http.Handler {
 			// Membership changes: owner only.
 			r.Group(func(r chi.Router) {
 				r.Use(RequireRole("owner"))
+				r.Post("/billing/checkout", s.CreateCheckout)
+				r.Post("/billing/portal", s.CreatePortal)
 				r.Patch("/team/members/{id}", s.ChangeRole)
 				r.Delete("/team/members/{id}", s.RemoveMember)
 			})

@@ -71,7 +71,13 @@ export type PlanUsage = {
 export type Account = {
   tenant: { name: string; slug: string }
   user: { email: string; role: 'owner' | 'admin' | 'member' }
-  plan: { code: string; name: string }
+  plan: {
+    code: string
+    name: string
+    has_billing: boolean
+    subscription_status: string | null
+    cancel_at_period_end: boolean
+  }
   counts: { members: number; monitors: number }
   status_url: string
 }
@@ -220,6 +226,16 @@ export const api = {
   listPlans: () => request<Plan[]>('/plans'),
 
   account: () => request<Account>('/account'),
+
+  checkout: (planCode: string) =>
+    request<{ url: string }>('/billing/checkout', {
+      method: 'POST',
+      body: JSON.stringify({ plan_code: planCode }),
+    }),
+
+  billingPortal: () =>
+    request<{ url: string }>('/billing/portal', { method: 'POST', body: '{}' }),
+
 
 
 
