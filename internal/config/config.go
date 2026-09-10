@@ -6,6 +6,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
 type Config struct {
@@ -15,6 +16,7 @@ type Config struct {
 	Region      string // which worker region produced a result
 	JWTSecret   string
 	MetricsPort string
+    CORSOrigins []string
 }
 
 func Load() (Config, error) {
@@ -25,6 +27,7 @@ func Load() (Config, error) {
 		Region:      getenv("PULSE_REGION", "local"),
 	    JWTSecret:   os.Getenv("JWT_SECRET"),
 	    MetricsPort: getenv("METRICS_PORT", "9090"),
+        CORSOrigins: strings.Split(getenv("CORS_ORIGINS", "http://localhost:5173,http://localhost:5174"), ","),
 	}
 	if c.DatabaseURL == "" || c.RedisURL == "" {
 		return c, fmt.Errorf("DATABASE_URL and REDIS_URL are required")

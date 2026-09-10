@@ -20,7 +20,7 @@ type Server struct {
 
 func (s *Server) Router() http.Handler {
 	r := chi.NewRouter()
-    r.Use(middleware.RequestID, middleware.Recoverer, Metrics)
+    r.Use(middleware.RequestID, middleware.Recoverer, Metrics, CORS(s.Cfg.CORSOrigins))
 
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(200) })
 	r.Get("/readyz", func(w http.ResponseWriter, req *http.Request) {
@@ -33,6 +33,7 @@ func (s *Server) Router() http.Handler {
 	r.Handle("/metrics", promhttp.Handler())
 
 	r.Route("/api/v1", func(r chi.Router) {
+        r.Get("/public/status/{slug}", s.PublicStatus)
 		r.Post("/auth/signup", s.Signup)
 		r.Post("/auth/login", s.Login)
 
