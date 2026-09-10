@@ -95,3 +95,10 @@
 - Public endpoint returns per-day uptime for 90 days (generate_series so gaps stay visible), active incidents, and 90 days of resolved incidents
 - Status page renders uptime bars, an "investigating" block for open incidents, and a past-incidents list with durations
 - Known N+1: daily uptime is one query per monitor; behind the 30s cache for now, single grouped query is the fix
+
+## 2026-09-10 — Phase 3.6 step 1: teams and roles
+- Roles enforced server-side via RequireRole middleware ranked owner > admin > member; reads open to all, writes admin+, membership changes owner-only
+- Invitations: hashed single-use tokens, 7-day expiry, re-invite replaces rather than duplicates, accept creates the user and consumes the invite in one transaction
+- Ownership transfer demotes the current owner in the same transaction, so a tenant never has zero or two owners
+- Config split three ways: API_URL for endpoint links, DASHBOARD_URL for links to app pages, STATUS_URL for status pages
+- Known limitation: a role change takes effect only when the user's 24h token is reissued; token versioning is the follow-up
