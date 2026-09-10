@@ -39,8 +39,8 @@ lint:
 
 IMAGE_PREFIX ?= pulse
 TAG ?= dev
-SERVICES = api scheduler worker migrate
-ALL_IMAGES = api scheduler worker migrate web status
+SERVICES = api scheduler worker migrate notifier
+ALL_IMAGES = api scheduler worker migrate notifier web status
 
 docker-build:  ## build all service images
 	@for s in $(SERVICES); do \
@@ -75,3 +75,6 @@ docker-build-web:  ## build the two frontend images
 	done
 ingress-forward:  ## expose the dev ingress on localhost:80 (needs sudo; runs in foreground)
 	sudo kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 80:80
+
+run-notifier:
+	METRICS_PORT=9092 go run ./apps/notifier/cmd/notifier

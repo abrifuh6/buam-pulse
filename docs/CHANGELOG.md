@@ -67,3 +67,9 @@
 - apps/status: standalone React app on :5174, reads /api/v1/public/status/{slug}, no auth
 - Light theme, overall banner (all operational / N down / pending), per-service uptime and average latency, 60s refresh
 - Deliberately a separate origin from the dashboard; slug comes from the URL path
+
+
+## 2026-09-10 — Phase 3.5 step 1: alerting foundations + SSRF protection
+- Migration 000002: alert channel verification, monitor→channel routing, notifications table with per-attempt state and UNIQUE(incident, channel, kind) idempotency
+- internal/checks/validate.go: rejects loopback, private, link-local, CGNAT and cloud-metadata targets at creation; ResolveGuard re-checks DNS at check time (rebinding defence)
+- Mailpit added to docker-compose for local mail (arm64-native); SMTP settings via env so SES drops in for stage/prod

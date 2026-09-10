@@ -17,5 +17,15 @@ services:
     image: redis:7-alpine
     ports: ["6379:6379"]
 
+  # Catches all outbound mail in dev. Web UI on 8025, SMTP on 1025.
+  # Replaced by SES in stage/prod — the app only knows SMTP settings.
+  # mailpit rather than mailhog: native arm64, so no emulation on Apple Silicon.
+  mailpit:
+    image: axllent/mailpit:latest
+    ports: ["1025:1025", "8025:8025"]
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+
 volumes:
   pgdata:

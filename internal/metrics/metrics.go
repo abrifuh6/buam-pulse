@@ -43,6 +43,23 @@ var (
 		Help: "API requests by route and status code.",
 	}, []string{"route", "status"})
 
+	// Notifier: delivery outcomes and how much work is waiting.
+	NotificationsSent = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "pulse_notifications_total",
+		Help: "Notification delivery attempts by channel type, kind and outcome.",
+	}, []string{"channel", "kind", "outcome"})
+
+	NotificationBacklog = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "pulse_notification_backlog",
+		Help: "Notifications waiting to be delivered.",
+	})
+
+	// Incidents opened, for correlating alert volume with real failures.
+	IncidentsOpened = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "pulse_incidents_opened_total",
+		Help: "Incidents opened.",
+	})
+
 	HTTPLatency = promauto.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "pulse_http_request_duration_seconds",
 		Help:    "API request latency.",
