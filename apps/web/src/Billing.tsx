@@ -86,7 +86,7 @@ export default function Billing() {
                 </div>
                 <div className="target">
                   {p.max_monitors} monitors · {interval(p.min_interval)} minimum ·{' '}
-                  {p.max_members} members · {p.retention_days}d history
+                  {p.max_members} {p.max_members === 1 ? 'member' : 'members'} · {p.retention_days}d history
                 </div>
               </div>
               <span className="metric" style={{ fontSize: 15 }}>
