@@ -90,3 +90,8 @@
 - Rate limiting on all auth endpoints: 10 requests per IP per minute, in-memory (per-pod) — see ADR 0005 for the Redis follow-up
 - X-Forwarded-For only trusted when TRUST_PROXY=true; header is spoofable when the API is directly reachable
 - Verified: 429 after 10 attempts; reset works end to end; token reuse rejected
+
+## 2026-09-10 — Phase 3.5 step 4: incidents on the status page
+- Public endpoint returns per-day uptime for 90 days (generate_series so gaps stay visible), active incidents, and 90 days of resolved incidents
+- Status page renders uptime bars, an "investigating" block for open incidents, and a past-incidents list with durations
+- Known N+1: daily uptime is one query per monitor; behind the 30s cache for now, single grouped query is the fix
