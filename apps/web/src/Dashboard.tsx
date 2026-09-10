@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, token, currentRole, type Monitor, type CheckResult } from './api'
 import Channels from './Channels'
 import Team from './Team'
+import Billing from './Billing'
 
 function Sparkline({ id, refreshKey }: { id: string; refreshKey: number }) {
   const [results, setResults] = useState<CheckResult[]>([])
@@ -185,7 +186,7 @@ function MonitorRow({
 }
 
 export default function Dashboard({ onLogout }: { onLogout: () => void }) {
-  const [tab, setTab] = useState<'monitors' | 'channels' | 'team'>('monitors')
+  const [tab, setTab] = useState<'monitors' | 'channels' | 'team' | 'billing'>('monitors')
   const role = currentRole()
   const canWrite = role === 'owner' || role === 'admin'
   const [monitors, setMonitors] = useState<Monitor[]>([])
@@ -238,6 +239,13 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
           </button>
           <button
             className="ghost"
+            onClick={() => setTab('billing')}
+            style={{ color: tab === 'billing' ? 'var(--text)' : undefined }}
+          >
+            Plan
+          </button>
+          <button
+            className="ghost"
             onClick={() => {
               token.clear()
               onLogout()
@@ -248,7 +256,9 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
         </div>
       </header>
 
-      {tab === 'team' ? (
+      {tab === 'billing' ? (
+        <Billing />
+      ) : tab === 'team' ? (
         <Team />
       ) : tab === 'monitors' ? (
         <>

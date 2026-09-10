@@ -57,3 +57,10 @@ button.ghost:hover { color: var(--text); }
 .spark { display: flex; gap: 2px; align-items: flex-end; height: 22px; }
 .spark i { width: 3px; background: var(--up); border-radius: 1px; display: block; }
 .spark i.bad { background: var(--down); }
+
+.usage { height: 6px; background: #0d0f13; border: 1px solid var(--border);
+  border-radius: 999px; overflow: hidden; }
+.usage i { display: block; height: 100%; border-radius: 999px; }
+.usage i.ok   { background: var(--up); }
+.usage i.warn { background: #e3a008; }
+.usage i.bad  { background: var(--down); }

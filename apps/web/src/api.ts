@@ -50,6 +50,23 @@ export type Invitation = {
   expires_at: string
 }
 
+
+export type Plan = {
+  code: string
+  name: string
+  max_monitors: number
+  min_interval: number
+  max_members: number
+  max_channels: number
+  retention_days: number
+  price_cents: number
+}
+
+export type PlanUsage = {
+  plan: Plan
+  usage: { monitors: number; members: number; channels: number }
+}
+
 const TOKEN_KEY = 'pulse.token'
 
 export const token = {
@@ -188,6 +205,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ token, password }),
     }),
+
+  currentPlan: () => request<PlanUsage>('/billing/plan'),
+
+  listPlans: () => request<Plan[]>('/plans'),
+
 
 
 }
