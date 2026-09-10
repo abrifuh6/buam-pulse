@@ -82,3 +82,11 @@
 - Verified: failure → 2 consecutive fails → incident → DOWN email; recovery → incident resolved → RECOVERED email with downtime duration
 - Dashboard: Monitors/Alerts tabs; per-monitor edit, pause and resume (resume schedules an immediate check); channel management with test-send
 - PATCH /monitors/{id}: partial update via nullable fields; monitor type is immutable
+
+## 2026-09-10 — Phase 3.5 step 3: auth hardening
+- Password reset and signup email verification via single-use, time-limited tokens; only SHA-256 hashes stored, so a DB leak yields no usable links
+- /auth/forgot returns the same response for known and unknown addresses (no account-enumeration oracle)
+- Reset claims the token and updates the password in one transaction, and voids the user's other outstanding reset tokens
+- Rate limiting on all auth endpoints: 10 requests per IP per minute, in-memory (per-pod) — see ADR 0005 for the Redis follow-up
+- X-Forwarded-For only trusted when TRUST_PROXY=true; header is spoofable when the API is directly reachable
+- Verified: 429 after 10 attempts; reset works end to end; token reuse rejected
