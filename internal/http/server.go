@@ -52,6 +52,7 @@ func (s *Server) Router() http.Handler {
 
 		// Public status pages.
 		r.Get("/public/status/{slug}", s.PublicStatus)
+		r.Get("/plans", s.ListPlans)
 
 		r.Group(func(r chi.Router) {
 			r.Use(RequireAuth(s.Cfg.JWTSecret))
@@ -62,6 +63,7 @@ func (s *Server) Router() http.Handler {
 			r.Get("/channels", s.ListChannels)
 			r.Get("/team/members", s.ListMembers)
 			r.Get("/team/invitations", s.ListInvitations)
+			r.Get("/billing/plan", s.CurrentPlan)
 
 			// Writes: admin and above.
 			r.Group(func(r chi.Router) {

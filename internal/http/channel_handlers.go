@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/abrifuh6/buam-pulse/internal/alerting"
+	"github.com/abrifuh6/buam-pulse/internal/plans"
 )
 
 type Channel struct {
@@ -103,15 +104,36 @@ func (s *Server) CreateChannel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	tx, err := s.DB.Begin(r.Context())
+	if err != nil {
+		writeErr(w, 500, "db")
+		return
+	}
+	defer func() { _ = tx.Rollback(r.Context()) }()
+
+	if err := plans.LockTenant(r.Context(), tx, c.TenantID); err != nil {
+		writeErr(w, 500, "db")
+		return
+	}
+	if err := plans.CheckChannel(r.Context(), tx, c.TenantID); err != nil {
+		writeErr(w, http.StatusPaymentRequired, err.Error())
+		return
+	}
+
 	raw, _ := json.Marshal(cfg)
 	var id string
-	err := s.DB.QueryRow(r.Context(), `
+	err = tx.QueryRow(r.Context(), `
 		INSERT INTO alert_channels (tenant_id, name, type, config, verify_token, verified_at)
 		VALUES ($1,$2,$3,$4,$5, CASE WHEN $3='slack' THEN now() ELSE NULL END)
 		RETURNING id`, c.TenantID, in.Name, in.Type, raw, nullIfEmpty(verifyToken)).Scan(&id)
 	if err != nil {
 		slog.Error("create channel", "err", err)
 		writeErr(w, 400, "could not create channel")
+		return
+	}
+
+	if err := tx.Commit(r.Context()); err != nil {
+		writeErr(w, 500, "db")
 		return
 	}
 

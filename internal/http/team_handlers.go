@@ -12,6 +12,7 @@ import (
 
 	"github.com/abrifuh6/buam-pulse/internal/alerting"
 	"github.com/abrifuh6/buam-pulse/internal/auth"
+	"github.com/abrifuh6/buam-pulse/internal/plans"
 )
 
 const inviteTTL = 7 * 24 * time.Hour
@@ -113,10 +114,26 @@ func (s *Server) InviteMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	tx, err := s.DB.Begin(r.Context())
+	if err != nil {
+		writeErr(w, 500, "db")
+		return
+	}
+	defer func() { _ = tx.Rollback(r.Context()) }()
+
+	if err := plans.LockTenant(r.Context(), tx, c.TenantID); err != nil {
+		writeErr(w, 500, "db")
+		return
+	}
+	if err := plans.CheckMember(r.Context(), tx, c.TenantID); err != nil {
+		writeErr(w, http.StatusPaymentRequired, err.Error())
+		return
+	}
+
 	token := randomToken()
 	// Re-inviting the same address replaces the outstanding invite rather than
 	// failing, which is what a user expects when they mistype and retry.
-	_, err = s.DB.Exec(r.Context(), `
+	_, err = tx.Exec(r.Context(), `
 		INSERT INTO invitations (tenant_id, email, role, token_hash, invited_by, expires_at)
 		VALUES ($1,$2,$3,$4,$5, now() + $6::interval)
 		ON CONFLICT (tenant_id, email) DO UPDATE
@@ -130,7 +147,12 @@ func (s *Server) InviteMember(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var tenantName string
-	_ = s.DB.QueryRow(r.Context(), `SELECT name FROM tenants WHERE id=$1`, c.TenantID).Scan(&tenantName)
+	_ = tx.QueryRow(r.Context(), `SELECT name FROM tenants WHERE id=$1`, c.TenantID).Scan(&tenantName)
+
+	if err := tx.Commit(r.Context()); err != nil {
+		writeErr(w, 500, "db")
+		return
+	}
 
 	link := s.Cfg.DashboardURL + "/accept?token=" + token
 	body := "You've been invited to join " + tenantName + " on Pulse as " + in.Role + ".\n\n" +

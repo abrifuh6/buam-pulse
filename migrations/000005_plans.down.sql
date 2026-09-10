@@ -1,0 +1,2 @@
+ALTER TABLE tenants DROP COLUMN IF EXISTS plan_code;
+DROP TABLE IF EXISTS plans;
