@@ -121,3 +121,9 @@
 - Fixed: handlers matched on customer id alone, so cancelling a duplicate subscription revoked a plan the tenant was still paying for. Now scoped to the tracked subscription — see ADR 0006
 - cancel_at_period_end tracked separately from canceled; the UI says access continues until the period ends
 - Debugging notes: CLI was authorized against a different sandbox than the API key (events fired where nothing listened); stripe-go v81 rejects newer account API versions unless IgnoreAPIVersionMismatch is set
+
+## 2026-09-10 — Phase 3.6 step 4: export and deletion
+- GET /account/export streams the tenant's monitors, results, incidents, members and channels as JSON; deliberately excludes password hashes, auth tokens, Stripe IDs and channel configs (a Slack webhook is a live credential)
+- DELETE /account requires typing the organization name, cancels the Stripe subscription before deleting, and relies on ON DELETE CASCADE for atomic removal
+- deletion_log records the request before anything is destroyed and the counts after, so there is evidence the data no longer exists
+- Verified: 3 monitors and 966 results removed, no orphaned rows, other tenants untouched
