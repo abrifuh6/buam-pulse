@@ -43,3 +43,27 @@ h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.02em; }
 footer { color: var(--muted); font-size: 13px; margin-top: 32px;
   border-top: 1px solid var(--border); padding-top: 16px; }
 .center { text-align: center; color: var(--muted); padding: 60px 0; }
+
+.item { display: block; }
+.item .head { display: flex; align-items: center; gap: 14px; }
+
+/* 90-day uptime bar. flex:1 on each tick keeps the row full-width at any
+   count, so a 20-day-old page and a 90-day-old page look consistent. */
+.bar { display: flex; gap: 2px; margin-top: 14px; height: 28px; }
+.bar i { flex: 1; border-radius: 2px; display: block; min-width: 2px; }
+.bar i.ok     { background: #3ba55d; }
+.bar i.warn   { background: #e3a008; }
+.bar i.bad    { background: var(--down); }
+.bar i.nodata { background: #e4e7ec; }
+
+.axis { display: flex; justify-content: space-between;
+  color: var(--muted); font-size: 12px; margin-top: 6px; }
+
+h2 { font-size: 15px; margin: 34px 0 12px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .06em; }
+
+.incident { display: flex; align-items: center; gap: 14px;
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px 18px; margin-bottom: 10px; }
+.incident.active { border-color: var(--down); background: var(--down-bg); }
+.incident .meta { color: var(--muted); font-size: 13px; margin-top: 2px; }
