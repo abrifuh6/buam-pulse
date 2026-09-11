@@ -2,7 +2,15 @@ import type { ReactNode } from 'react'
 import AccountHeader from './AccountHeader'
 import type { Account } from './api'
 
-export type Tab = 'monitors' | 'channels' | 'maintenance' | 'status' | 'team' | 'billing'
+export type Tab =
+  | 'monitors'
+  | 'incidents'
+  | 'channels'
+  | 'maintenance'
+  | 'status'
+  | 'team'
+  | 'billing'
+  | 'account'
 
 // Icons are inline rather than a library: six 16px glyphs is not worth a
 // dependency, and hand-drawn paths keep the stroke weight consistent with the
@@ -23,6 +31,13 @@ function Icon({ name }: { name: Tab }) {
       return (
         <svg {...common}>
           <path d="M1 9h3l2-5 3 10 2-6h4" />
+        </svg>
+      )
+    case 'incidents':
+      return (
+        <svg {...common}>
+          <path d="M8 1.5 1.5 13h13L8 1.5z" />
+          <path d="M8 6v3M8 11h.01" />
         </svg>
       )
     case 'channels':
@@ -53,6 +68,13 @@ function Icon({ name }: { name: Tab }) {
           <path d="M1.5 13.5a4.5 4.5 0 0 1 9 0M11 4.2a2.5 2.5 0 0 1 0 4.6M12 13.5a4.5 4.5 0 0 0-1.2-3" />
         </svg>
       )
+    case 'account':
+      return (
+        <svg {...common}>
+          <circle cx="8" cy="5.5" r="2.75" />
+          <path d="M2.5 14a5.5 5.5 0 0 1 11 0" />
+        </svg>
+      )
     case 'billing':
       return (
         <svg {...common}>
@@ -65,11 +87,13 @@ function Icon({ name }: { name: Tab }) {
 
 const NAV: { id: Tab; label: string }[] = [
   { id: 'monitors', label: 'Monitors' },
+  { id: 'incidents', label: 'Incidents' },
   { id: 'channels', label: 'Alerts' },
   { id: 'maintenance', label: 'Maintenance' },
   { id: 'status', label: 'Status page' },
   { id: 'team', label: 'Team' },
   { id: 'billing', label: 'Plan' },
+  { id: 'account', label: 'Account' },
 ]
 
 export default function Shell({

@@ -163,3 +163,52 @@ func (s *Server) sendVerification(r *http.Request, userID, email string) {
 		slog.Error("send verification email", "err", err)
 	}
 }
+
+type changePasswordReq struct {
+	Current string `json:"current_password"`
+	New     string `json:"new_password"`
+}
+
+// ChangePassword requires the current password even though the user is already
+// authenticated. A session left open on a shared machine should not be enough
+// to lock the real owner out of their own account.
+func (s *Server) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	c := claimsFrom(r)
+
+	var in changePasswordReq
+	if err := decode(r, &in); err != nil || len(in.New) < 8 {
+		writeErr(w, 400, "Your new password must be at least 8 characters.")
+		return
+	}
+
+	var hash string
+	if err := s.DB.QueryRow(r.Context(),
+		`SELECT password_hash FROM users WHERE id=$1`, c.UserID).Scan(&hash); err != nil {
+		writeErr(w, 500, "db")
+		return
+	}
+	if !auth.CheckPassword(hash, in.Current) {
+		writeErr(w, 401, "That is not your current password.")
+		return
+	}
+
+	next, err := auth.HashPassword(in.New)
+	if err != nil {
+		writeErr(w, 500, "hash failed")
+		return
+	}
+	if _, err := s.DB.Exec(r.Context(),
+		`UPDATE users SET password_hash=$2 WHERE id=$1`, c.UserID, next); err != nil {
+		writeErr(w, 500, "db")
+		return
+	}
+	// Any outstanding reset links are void: changing your password should
+	// invalidate a link someone may have requested on your behalf.
+	if _, err := s.DB.Exec(r.Context(), `
+		UPDATE auth_tokens SET used_at=now()
+		WHERE user_id=$1 AND kind='reset' AND used_at IS NULL`, c.UserID); err != nil {
+		slog.Warn("void reset tokens", "err", err)
+	}
+
+	writeJSON(w, 200, map[string]string{"status": "password updated"})
+}

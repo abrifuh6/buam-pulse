@@ -680,3 +680,5 @@ button.danger:hover { background: #ff6a56; }
 }
 
 .detail-head { margin-bottom: var(--s-4); }
+
+.search { max-width: 280px; }

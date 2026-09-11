@@ -421,3 +421,49 @@ func (s *Server) MonitorDetail(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, 200, out)
 }
+
+type incidentRow struct {
+	ID         string     `json:"id"`
+	Monitor    string     `json:"monitor"`
+	MonitorID  string     `json:"monitor_id"`
+	StartedAt  time.Time  `json:"started_at"`
+	ResolvedAt *time.Time `json:"resolved_at"`
+	Minutes    int        `json:"minutes"`
+	Planned    bool       `json:"planned"`
+	Notified   bool       `json:"notified"`
+	Cause      *string    `json:"cause"`
+}
+
+// ListIncidents is the account-wide view: what has been breaking, across every
+// monitor. Ongoing incidents sort first regardless of age, because a current
+// outage matters more than a longer one that ended yesterday.
+func (s *Server) ListIncidents(w http.ResponseWriter, r *http.Request) {
+	c := claimsFrom(r)
+
+	rows, err := s.DB.Query(r.Context(), `
+		SELECT i.id, m.name, m.id, i.started_at, i.resolved_at,
+		       EXTRACT(EPOCH FROM (COALESCE(i.resolved_at, now()) - i.started_at))/60,
+		       i.planned, i.notified_at IS NOT NULL, i.cause
+		FROM incidents i
+		JOIN monitors m ON m.id = i.monitor_id
+		WHERE i.tenant_id = $1
+		ORDER BY (i.resolved_at IS NULL) DESC, i.started_at DESC
+		LIMIT 100`, c.TenantID)
+	if err != nil {
+		writeErr(w, 500, "db")
+		return
+	}
+	defer rows.Close()
+
+	out := []incidentRow{}
+	for rows.Next() {
+		var ir incidentRow
+		var mins float64
+		if rows.Scan(&ir.ID, &ir.Monitor, &ir.MonitorID, &ir.StartedAt, &ir.ResolvedAt,
+			&mins, &ir.Planned, &ir.Notified, &ir.Cause) == nil {
+			ir.Minutes = int(mins)
+			out = append(out, ir)
+		}
+	}
+	writeJSON(w, 200, out)
+}

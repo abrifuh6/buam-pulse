@@ -141,6 +141,19 @@ export type MonitorDetail = {
   incidents: DetailIncident[]
 }
 
+
+export type IncidentRow = {
+  id: string
+  monitor: string
+  monitor_id: string
+  started_at: string
+  resolved_at: string | null
+  minutes: number
+  planned: boolean
+  notified: boolean
+  cause: string | null
+}
+
 const TOKEN_KEY = 'pulse.token'
 
 export const token = {
@@ -224,6 +237,8 @@ export const api = {
     }),
 
   listMonitors: () => request<Monitor[]>('/monitors'),
+
+  listIncidents: () => request<IncidentRow[]>('/incidents'),
 
   createMonitor: (m: {
     name: string
@@ -309,6 +324,18 @@ export const api = {
   listPlans: () => request<Plan[]>('/plans'),
 
   account: () => request<Account>('/account'),
+
+  changePassword: (current_password: string, new_password: string) =>
+    request<{ status: string }>('/account/password', {
+      method: 'POST',
+      body: JSON.stringify({ current_password, new_password }),
+    }),
+
+  deleteAccount: (confirm: string) =>
+    request<{ status: string }>('/account', {
+      method: 'DELETE',
+      body: JSON.stringify({ confirm }),
+    }),
 
   checkout: (planCode: string) =>
     request<{ url: string }>('/billing/checkout', {

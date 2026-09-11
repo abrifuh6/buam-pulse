@@ -25,18 +25,47 @@ export default function Monitors({
   channels,
   canWrite,
   loading,
+  openMonitor,
+  onOpened,
   onChanged,
 }: {
   monitors: Monitor[]
   channels: Channel[]
   canWrite: boolean
   loading: boolean
+  openMonitor?: string | null
+  onOpened?: () => void
   onChanged: () => void
 }) {
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<Monitor | null>(null)
   const [viewing, setViewing] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
   const [data, setData] = useState<Record<string, RowData>>({})
+
+  // An incident click hands us a monitor to open.
+  useEffect(() => {
+    if (openMonitor) {
+      setViewing(openMonitor)
+      onOpened?.()
+    }
+  }, [openMonitor, onOpened])
+
+  // Keyboard: / focuses search, n adds a monitor. Both are ignored while
+  // typing, so they never swallow a character mid-word.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement
+      if (el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA') return
+      if (e.key === '/') {
+        e.preventDefault()
+        document.getElementById('monitor-search')?.focus()
+      }
+      if (e.key === 'n' && canWrite) setAdding(true)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [canWrite])
 
   // One request per monitor for its recent history. Batched into a single
   // effect keyed on the monitor list so a poll does not stack requests.
@@ -107,14 +136,25 @@ export default function Monitors({
     )
   }
 
+  const q = query.trim().toLowerCase()
+  const shown = q
+    ? monitors.filter(
+        (m) => m.name.toLowerCase().includes(q) || m.target.toLowerCase().includes(q),
+      )
+    : monitors
+
   return (
     <>
       <StatusStrip monitors={monitors} />
 
       <div className="spread" style={{ marginBottom: 'var(--s-3)' }}>
-        <span className="metric">
-          {monitors.length} {monitors.length === 1 ? 'monitor' : 'monitors'}
-        </span>
+        <input
+          id="monitor-search"
+          className="search"
+          placeholder="Search monitors…  /"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
         {canWrite && <button onClick={() => setAdding(true)}>Add monitor</button>}
       </div>
 
@@ -132,7 +172,7 @@ export default function Monitors({
             </tr>
           </thead>
           <tbody>
-            {monitors.map((m) => {
+            {shown.map((m) => {
               const d = data[m.id]
               const lastResult = d?.results[d.results.length - 1]
               const latency = lastResult?.latency_ms

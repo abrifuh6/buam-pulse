@@ -62,6 +62,7 @@ func (s *Server) Router() http.Handler {
 
 			// Reads: any member.
 			r.Get("/monitors", s.ListMonitors)
+			r.Get("/incidents", s.ListIncidents)
 			r.Get("/monitors/{id}/results", s.MonitorResults)
 			r.Get("/monitors/{id}/channels", s.GetMonitorChannels)
 			r.Get("/monitors/{id}/detail", s.MonitorDetail)
@@ -72,6 +73,7 @@ func (s *Server) Router() http.Handler {
 			r.Get("/team/invitations", s.ListInvitations)
 			r.Get("/billing/plan", s.CurrentPlan)
 			r.Get("/account", s.GetAccount)
+			r.Post("/account/password", s.ChangePassword)
 
 			// Writes: admin and above.
 			r.Group(func(r chi.Router) {
