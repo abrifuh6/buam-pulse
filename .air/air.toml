@@ -1,0 +1,18 @@
+# Shared Air configuration. SERVICE selects which binary to build and run, so
+# all five services use this one file.
+root = "/src"
+tmp_dir = "/tmp/air"
+
+[build]
+  cmd = "go build -o /tmp/air/app ./apps/${SERVICE}/cmd/${SERVICE}"
+  entrypoint = "/tmp/air/app"
+  include_ext = ["go", "sql"]
+  exclude_dir = ["apps/web", "apps/status", "deploy", "infra", "docs", ".git"]
+  # A moment's grace so a multi-file save triggers one rebuild, not five.
+  delay = 500
+  stop_on_error = true
+  send_interrupt = true
+  kill_delay = "2s"
+
+[log]
+  time = false

@@ -1,7 +1,7 @@
 include .env
 export
 
-.PHONY: doctor stripe-setup up down migrate-up migrate-down run-api run-scheduler run-worker test lint docker-build
+.PHONY: doctor stripe-setup dev-up dev-down dev-logs dev-ps dev-restart up down migrate-up migrate-down run-api run-scheduler run-worker test lint docker-build
 
 doctor:        ## verify required tools are installed
 	@for t in docker go migrate; do \
@@ -84,3 +84,27 @@ stripe-setup:  ## create Stripe products/prices and store their IDs
 
 run-retention:
 	METRICS_PORT=9093 go run ./apps/retention/cmd/retention
+
+COMPOSE_DEV = docker compose -f docker-compose.yml -f docker-compose.dev.yml
+
+dev-up:        ## start the whole stack (postgres, redis, mailpit + all Go services)
+	$(COMPOSE_DEV) up -d --build
+	@echo
+	@$(COMPOSE_DEV) ps
+	@echo
+	@echo "API        http://localhost:8080"
+	@echo "Mail       http://localhost:8025"
+	@echo "Dashboard  cd apps/web && npm run dev     → http://localhost:5173"
+	@echo "Status     cd apps/status && npm run dev  → http://localhost:5174"
+
+dev-down:      ## stop everything
+	$(COMPOSE_DEV) down
+
+dev-logs:      ## tail all service logs (make dev-logs S=worker for one)
+	$(COMPOSE_DEV) logs -f $(S)
+
+dev-ps:
+	$(COMPOSE_DEV) ps
+
+dev-restart:   ## restart one service, e.g. make dev-restart S=worker
+	$(COMPOSE_DEV) restart $(S)

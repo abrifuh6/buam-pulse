@@ -1,0 +1,89 @@
+# All Go services, for local development. Layered on top of docker-compose.yml:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#
+# Compose replaces containers rather than stacking them, which removes the
+# duplicate-process problem that `go run` in multiple terminal tabs creates.
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    environment: &goenv
+      SERVICE: api
+      DATABASE_URL: postgres://pulse:pulse@postgres:5432/pulse?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me}
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      ALERT_FROM: alerts@pulse.local
+      # Reached from the BROWSER, so these are host addresses, not service names.
+      API_URL: http://localhost:8080
+      DASHBOARD_URL: http://localhost:5173
+      STATUS_URL: http://localhost:5174
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      AIR_CONFIG: /src/.air/air.toml
+    command: ["-c", "/src/.air/air.toml"]
+    volumes:
+      - .:/src
+      - go-build:/root/.cache/go-build
+    ports: ["8080:8080"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_started }
+
+  scheduler:
+    build: { context: ., dockerfile: Dockerfile.dev }
+    environment:
+      <<: *goenv
+      SERVICE: scheduler
+      METRICS_PORT: "9090"
+    command: ["-c", "/src/.air/air.toml"]
+    volumes: [".:/src", "go-build:/root/.cache/go-build"]
+    ports: ["9091:9090"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_started }
+
+  worker:
+    build: { context: ., dockerfile: Dockerfile.dev }
+    environment:
+      <<: *goenv
+      SERVICE: worker
+      METRICS_PORT: "9090"
+      PULSE_REGION: local
+    command: ["-c", "/src/.air/air.toml"]
+    volumes: [".:/src", "go-build:/root/.cache/go-build"]
+    ports: ["9090:9090"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_started }
+
+  notifier:
+    build: { context: ., dockerfile: Dockerfile.dev }
+    environment:
+      <<: *goenv
+      SERVICE: notifier
+      METRICS_PORT: "9090"
+    command: ["-c", "/src/.air/air.toml"]
+    volumes: [".:/src", "go-build:/root/.cache/go-build"]
+    ports: ["9092:9090"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      mailpit:  { condition: service_started }
+
+  retention:
+    build: { context: ., dockerfile: Dockerfile.dev }
+    environment:
+      <<: *goenv
+      SERVICE: retention
+      METRICS_PORT: "9090"
+    command: ["-c", "/src/.air/air.toml"]
+    volumes: [".:/src", "go-build:/root/.cache/go-build"]
+    ports: ["9093:9090"]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+volumes:
+  go-build:

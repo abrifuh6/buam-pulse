@@ -56,7 +56,7 @@ func main() {
 	}
 
 	metrics.Serve(":" + cfg.MetricsPort)
-	log.Info("worker started", "metrics_port", cfg.MetricsPort, "region", cfg.Region)
+	log.Info("worker started (hot reload works)", "metrics_port", cfg.MetricsPort, "region", cfg.Region)
 
 	for {
 		id, err := q.Dequeue(ctx, 5*time.Second)

@@ -1,0 +1,19 @@
+# syntax=docker/dockerfile:1
+# Development image only. Unlike the production Dockerfile this keeps the Go
+# toolchain and the source, so a file change triggers a rebuild inside the
+# container instead of requiring a new image. Never deployed anywhere.
+FROM golang:1.26-alpine
+
+RUN apk add --no-cache git
+WORKDIR /src
+
+# Air watches the filesystem and restarts the binary on change — the container
+# equivalent of stopping and re-running `go run`, without the tab juggling.
+RUN go install github.com/air-verse/air@latest
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Source arrives via a bind mount at runtime; nothing is copied in, so edits on
+# the host are visible immediately.
+ENTRYPOINT ["air"]
