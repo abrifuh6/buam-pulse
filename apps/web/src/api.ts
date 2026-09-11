@@ -19,6 +19,8 @@ export type Monitor = {
   ssl_expires_at: string | null
   ssl_issuer: string | null
   alert_delay_seconds: number
+  public: boolean
+  public_name: string | null
 }
 
 export type CheckResult = {
@@ -98,6 +100,17 @@ export type MaintenanceWindow = {
   ends_at: string
   monitor_ids: string[]
   active: boolean
+}
+
+
+export type StatusPageSettings = {
+  title: string | null
+  description: string | null
+  support_url: string | null
+  hide_branding: boolean
+  can_hide_branding: boolean
+  slug: string
+  public_url: string
 }
 
 const TOKEN_KEY = 'pulse.token'
@@ -187,6 +200,8 @@ export const api = {
       interval_seconds: number
       enabled: boolean
       alert_delay_seconds: number
+      public: boolean
+      public_name: string
     }>,
   ) => request<void>(`/monitors/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
 
@@ -267,6 +282,26 @@ export const api = {
 
   deleteMaintenance: (id: string) =>
     request<void>(`/maintenance/${id}`, { method: 'DELETE' }),
+
+  monitorChannels: (id: string) =>
+    request<{ channel_ids: string[] }>(`/monitors/${id}/channels`),
+
+  setMonitorChannels: (id: string, channelIds: string[]) =>
+    request<void>(`/monitors/${id}/channels`, {
+      method: 'PUT',
+      body: JSON.stringify({ channel_ids: channelIds }),
+    }),
+
+  statusPageSettings: () => request<StatusPageSettings>('/status-page'),
+
+  updateStatusPage: (p: {
+    title?: string
+    description?: string
+    support_url?: string
+    hide_branding?: boolean
+  }) => request<void>('/status-page', { method: 'PATCH', body: JSON.stringify(p) }),
+
+
 
 
 

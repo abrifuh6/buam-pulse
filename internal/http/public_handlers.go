@@ -30,43 +30,58 @@ type publicIncident struct {
 }
 
 type publicStatus struct {
-	Tenant    string           `json:"tenant"`
-	Monitors  []publicMonitor  `json:"monitors"`
-	Active    []publicIncident `json:"active_incidents"`
-	Recent    []publicIncident `json:"recent_incidents"`
-	UpdatedAt time.Time        `json:"updated_at"`
+	Tenant       string           `json:"tenant"`
+	Description  *string          `json:"description"`
+	SupportURL   *string          `json:"support_url"`
+	HideBranding bool             `json:"hide_branding"`
+	Monitors     []publicMonitor  `json:"monitors"`
+	Active       []publicIncident `json:"active_incidents"`
+	Recent       []publicIncident `json:"recent_incidents"`
+	UpdatedAt    time.Time        `json:"updated_at"`
 }
 
 func (s *Server) PublicStatus(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
 
 	var tenantID, name string
-	if err := s.DB.QueryRow(r.Context(),
-		`SELECT id, name FROM tenants WHERE slug=$1`, slug).Scan(&tenantID, &name); err != nil {
+	var title, description, supportURL *string
+	var hideBranding bool
+	if err := s.DB.QueryRow(r.Context(), `
+		SELECT id, name, status_title, status_description,
+		       status_support_url, status_hide_branding
+		FROM tenants WHERE slug=$1`, slug).
+		Scan(&tenantID, &name, &title, &description, &supportURL, &hideBranding); err != nil {
 		writeErr(w, 404, "status page not found")
 		return
 	}
+	// A custom title replaces the organisation name on the public page.
+	if title != nil && *title != "" {
+		name = *title
+	}
 
 	out := publicStatus{
-		Tenant:    name,
-		Monitors:  []publicMonitor{},
-		Active:    []publicIncident{},
-		Recent:    []publicIncident{},
-		UpdatedAt: time.Now().UTC(),
+		Tenant:       name,
+		Description:  description,
+		SupportURL:   supportURL,
+		HideBranding: hideBranding,
+		Monitors:     []publicMonitor{},
+		Active:       []publicIncident{},
+		Recent:       []publicIncident{},
+		UpdatedAt:    time.Now().UTC(),
 	}
 
 	// Per-monitor summary. Paused monitors are excluded: a customer who paused
 	// a check has said they don't want it reported.
 	rows, err := s.DB.Query(r.Context(), `
-		SELECT m.id, m.name, m.status,
+		SELECT m.id, COALESCE(NULLIF(m.public_name,''), m.name), m.status,
 		       COALESCE(ROUND(100.0 * COUNT(*) FILTER (WHERE cr.ok) / NULLIF(COUNT(cr.id),0), 2), 0)::float8,
 		       AVG(cr.latency_ms) FILTER (WHERE cr.ok)::int
 		FROM monitors m
 		LEFT JOIN check_results cr
 		       ON cr.monitor_id = m.id
 		      AND cr.checked_at > now() - interval '90 days'
-		WHERE m.tenant_id = $1 AND m.enabled
-		GROUP BY m.id, m.name, m.status
+		WHERE m.tenant_id = $1 AND m.enabled AND m.public
+		GROUP BY m.id, m.name, m.public_name, m.status
 		ORDER BY m.name`, tenantID)
 	if err != nil {
 		writeErr(w, 500, "db")
@@ -147,13 +162,16 @@ func (s *Server) PublicStatus(w http.ResponseWriter, r *http.Request) {
 
 	// Incidents: anything open now, plus what happened in the last 90 days.
 	iRows, err := s.DB.Query(r.Context(), `
-		SELECT m.name, i.started_at, i.resolved_at,
+		SELECT COALESCE(NULLIF(m.public_name,''), m.name), i.started_at, i.resolved_at,
 		       EXTRACT(EPOCH FROM (COALESCE(i.resolved_at, now()) - i.started_at))/60
 		FROM incidents i
 		JOIN monitors m ON m.id = i.monitor_id
 		WHERE i.tenant_id = $1
 		  AND i.started_at > now() - interval '90 days'
-		  AND m.enabled
+		  AND m.enabled AND m.public
+		  -- Planned downtime is shown separately on the page, not as an
+		  -- unexplained outage.
+		  AND NOT i.planned
 		ORDER BY i.started_at DESC
 		LIMIT 50`, tenantID)
 	if err == nil {

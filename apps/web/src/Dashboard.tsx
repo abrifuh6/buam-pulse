@@ -1,9 +1,17 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api, currentRole, type Monitor, type CheckResult, type Account } from './api'
+import {
+  api,
+  currentRole,
+  type Monitor,
+  type CheckResult,
+  type Account,
+  type Channel,
+} from './api'
 import Channels from './Channels'
 import Team from './Team'
 import Billing from './Billing'
 import Maintenance from './Maintenance'
+import StatusPage from './StatusPage'
 import AccountHeader from './AccountHeader'
 
 function Sparkline({ id, refreshKey }: { id: string; refreshKey: number }) {
@@ -98,11 +106,13 @@ function MonitorRow({
   m,
   refreshKey,
   canWrite,
+  channels,
   onChanged,
 }: {
   m: Monitor
   refreshKey: number
   canWrite: boolean
+  channels: Channel[]
   onChanged: () => void
 }) {
   const [editing, setEditing] = useState(false)
@@ -110,7 +120,18 @@ function MonitorRow({
   const [target, setTarget] = useState(m.target)
   const [interval, setInterval] = useState(m.interval_seconds)
   const [delay, setDelay] = useState(m.alert_delay_seconds)
+  const [routed, setRouted] = useState<string[] | null>(null)
   const [err, setErr] = useState('')
+
+  // Routing is loaded only when the row is opened for editing: fetching it for
+  // every monitor on every refresh would be a request per row per 15 seconds.
+  useEffect(() => {
+    if (!editing || routed !== null) return
+    api
+      .monitorChannels(m.id)
+      .then((r) => setRouted(r.channel_ids))
+      .catch(() => setRouted([]))
+  }, [editing, routed, m.id])
 
   async function save() {
     setErr('')
@@ -121,6 +142,9 @@ function MonitorRow({
         interval_seconds: interval,
         alert_delay_seconds: delay,
       })
+      if (routed !== null) {
+        await api.setMonitorChannels(m.id, routed)
+      }
       setEditing(false)
       onChanged()
     } catch (e) {
@@ -165,6 +189,38 @@ function MonitorRow({
             a delay avoids paging anyone for a brief blip
           </span>
         </div>
+
+        {channels.length > 0 && (
+          <div style={{ marginTop: 14 }}>
+            <div className="metric" style={{ marginBottom: 8 }}>
+              {routed === null
+                ? 'Loading alert routing…'
+                : routed.length === 0
+                  ? 'Alerts go to every channel'
+                  : `Alerts go to ${routed.length} selected`}
+            </div>
+            <div className="chips">
+              {channels.map((ch) => (
+                <button
+                  key={ch.id}
+                  className={`chip ${routed?.includes(ch.id) ? 'on' : ''}`}
+                  disabled={routed === null}
+                  onClick={() =>
+                    setRouted((cur) =>
+                      cur === null
+                        ? cur
+                        : cur.includes(ch.id)
+                          ? cur.filter((x) => x !== ch.id)
+                          : [...cur, ch.id],
+                    )
+                  }
+                >
+                  {ch.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div style={{ marginTop: 10 }}>
           <button className="ghost" onClick={() => setEditing(false)}>
             Cancel
@@ -206,12 +262,15 @@ function MonitorRow({
 }
 
 export default function Dashboard({ onLogout }: { onLogout: () => void }) {
-  const [tab, setTab] = useState<'monitors' | 'channels' | 'maintenance' | 'team' | 'billing'>('monitors')
+  const [tab, setTab] = useState<'monitors' | 'channels' | 'maintenance' | 'status' | 'team' | 'billing'>(
+    'monitors',
+  )
   const role = currentRole()
   const canWrite = role === 'owner' || role === 'admin'
   const [monitors, setMonitors] = useState<Monitor[]>([])
   const [refreshKey, setRefreshKey] = useState(0)
   const [account, setAccount] = useState<Account | null>(null)
+  const [channels, setChannels] = useState<Channel[]>([])
   const [err, setErr] = useState('')
 
   const load = useCallback(async () => {
@@ -226,6 +285,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
 
   useEffect(() => {
     api.account().then(setAccount).catch(() => {})
+    api.listChannels().then(setChannels).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -264,6 +324,13 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
           </button>
           <button
             className="ghost"
+            onClick={() => setTab('status')}
+            style={{ color: tab === 'status' ? 'var(--text)' : undefined }}
+          >
+            Status page
+          </button>
+          <button
+            className="ghost"
             onClick={() => setTab('team')}
             style={{ color: tab === 'team' ? 'var(--text)' : undefined }}
           >
@@ -287,7 +354,9 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
         </div>
       </header>
 
-      {tab === 'maintenance' ? (
+      {tab === 'status' ? (
+        <StatusPage monitors={monitors} onChanged={load} />
+      ) : tab === 'maintenance' ? (
         <Maintenance monitors={monitors} />
       ) : tab === 'billing' ? (
         <Billing account={account} />
@@ -306,6 +375,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
               m={m}
               refreshKey={refreshKey}
               canWrite={canWrite}
+              channels={channels}
               onChanged={load}
             />
           ))}

@@ -32,6 +32,8 @@ type Monitor struct {
 	SSLExpiresAt      *time.Time `json:"ssl_expires_at"`
 	SSLIssuer         *string    `json:"ssl_issuer"`
 	AlertDelaySeconds int        `json:"alert_delay_seconds"`
+	Public            bool       `json:"public"`
+	PublicName        *string    `json:"public_name"`
 }
 
 // Every query below filters by tenant_id from the token. A user can never
@@ -43,7 +45,7 @@ func (s *Server) ListMonitors(w http.ResponseWriter, r *http.Request) {
 		SELECT id, name, type, target, interval_seconds, timeout_seconds,
 		       expected_status, enabled, status, created_at,
 		       keyword, keyword_present, check_ssl, ssl_warn_days,
-		       ssl_expires_at, ssl_issuer, alert_delay_seconds
+		       ssl_expires_at, ssl_issuer, alert_delay_seconds, public, public_name
 		FROM monitors WHERE tenant_id=$1 ORDER BY created_at`, c.TenantID)
 	if err != nil {
 		writeErr(w, 500, "db")
@@ -56,7 +58,8 @@ func (s *Server) ListMonitors(w http.ResponseWriter, r *http.Request) {
 		if err := rows.Scan(&m.ID, &m.Name, &m.Type, &m.Target, &m.IntervalSeconds, &m.TimeoutSeconds,
 			&m.ExpectedStatus, &m.Enabled, &m.Status, &m.CreatedAt,
 			&m.Keyword, &m.KeywordPresent, &m.CheckSSL, &m.SSLWarnDays,
-			&m.SSLExpiresAt, &m.SSLIssuer, &m.AlertDelaySeconds); err == nil {
+			&m.SSLExpiresAt, &m.SSLIssuer, &m.AlertDelaySeconds,
+			&m.Public, &m.PublicName); err == nil {
 			out = append(out, m)
 		}
 	}
@@ -175,6 +178,8 @@ type monitorUpdateReq struct {
 	CheckSSL          *bool   `json:"check_ssl"`
 	SSLWarnDays       *int    `json:"ssl_warn_days"`
 	AlertDelaySeconds *int    `json:"alert_delay_seconds"`
+	Public            *bool   `json:"public"`
+	PublicName        *string `json:"public_name"`
 }
 
 // UpdateMonitor is a partial update: pointer fields distinguish "not supplied"
@@ -233,12 +238,15 @@ func (s *Server) UpdateMonitor(w http.ResponseWriter, r *http.Request) {
 		  check_ssl        = COALESCE($11, check_ssl),
 		  ssl_warn_days    = COALESCE($12, ssl_warn_days),
 		  alert_delay_seconds = COALESCE($13, alert_delay_seconds),
+		  public           = COALESCE($14, public),
+		  public_name      = COALESCE(NULLIF($15,''), public_name),
 		  next_run_at      = CASE WHEN $8 IS TRUE AND NOT enabled THEN now() ELSE next_run_at END,
 		  updated_at       = now()
 		WHERE id=$1 AND tenant_id=$2`,
 		id, c.TenantID, in.Name, in.Target, in.IntervalSeconds,
 		in.TimeoutSeconds, in.ExpectedStatus, in.Enabled,
-		in.Keyword, in.KeywordPresent, in.CheckSSL, in.SSLWarnDays, in.AlertDelaySeconds)
+		in.Keyword, in.KeywordPresent, in.CheckSSL, in.SSLWarnDays, in.AlertDelaySeconds,
+		in.Public, in.PublicName)
 	if err != nil {
 		slog.Error("update monitor", "err", err)
 		writeErr(w, 400, "could not update monitor (interval must be 30–3600s)")

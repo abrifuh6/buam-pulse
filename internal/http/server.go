@@ -63,8 +63,10 @@ func (s *Server) Router() http.Handler {
 			// Reads: any member.
 			r.Get("/monitors", s.ListMonitors)
 			r.Get("/monitors/{id}/results", s.MonitorResults)
+			r.Get("/monitors/{id}/channels", s.GetMonitorChannels)
 			r.Get("/channels", s.ListChannels)
 			r.Get("/maintenance", s.ListMaintenance)
+			r.Get("/status-page", s.GetStatusPageSettings)
 			r.Get("/team/members", s.ListMembers)
 			r.Get("/team/invitations", s.ListInvitations)
 			r.Get("/billing/plan", s.CurrentPlan)
@@ -75,12 +77,14 @@ func (s *Server) Router() http.Handler {
 				r.Use(RequireRole("admin"))
 				r.Post("/monitors", s.CreateMonitor)
 				r.Patch("/monitors/{id}", s.UpdateMonitor)
+				r.Put("/monitors/{id}/channels", s.SetMonitorChannels)
 				r.Delete("/monitors/{id}", s.DeleteMonitor)
 
 				r.Post("/channels", s.CreateChannel)
 				r.Delete("/channels/{id}", s.DeleteChannel)
 				r.Post("/channels/{id}/test", s.TestChannel)
 
+				r.Patch("/status-page", s.UpdateStatusPageSettings)
 				r.Post("/maintenance", s.CreateMaintenance)
 				r.Delete("/maintenance/{id}", s.DeleteMaintenance)
 				r.Post("/team/invitations", s.InviteMember)

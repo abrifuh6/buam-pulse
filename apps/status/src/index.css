@@ -67,3 +67,6 @@ h2 { font-size: 15px; margin: 34px 0 12px; color: var(--muted);
   padding: 14px 18px; margin-bottom: 10px; }
 .incident.active { border-color: var(--down); background: var(--down-bg); }
 .incident .meta { color: var(--muted); font-size: 13px; margin-top: 2px; }
+
+footer a { color: var(--muted); }
+footer a:hover { color: var(--text); }

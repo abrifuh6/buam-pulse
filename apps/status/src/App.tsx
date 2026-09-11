@@ -15,6 +15,9 @@ type Incident = {
 }
 type Status = {
   tenant: string
+  description: string | null
+  support_url: string | null
+  hide_branding: boolean
   monitors: Monitor[]
   active_incidents: Incident[]
   recent_incidents: Incident[]
@@ -100,7 +103,7 @@ export default function App() {
   return (
     <div className="wrap">
       <h1>{data.tenant}</h1>
-      <p className="sub">Service status</p>
+      <p className="sub">{data.description || 'Service status'}</p>
 
       <div className={`banner ${banner.cls}`}>{banner.text}</div>
 
@@ -162,7 +165,16 @@ export default function App() {
       )}
 
       <footer>
-        Updated {new Date(data.updated_at).toLocaleString()} · Powered by Pulse
+        Updated {new Date(data.updated_at).toLocaleString()}
+        {data.support_url && (
+          <>
+            {' · '}
+            <a href={data.support_url} target="_blank" rel="noreferrer">
+              Contact support
+            </a>
+          </>
+        )}
+        {!data.hide_branding && ' · Powered by Pulse'}
       </footer>
     </div>
   )
