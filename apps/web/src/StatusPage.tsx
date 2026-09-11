@@ -14,6 +14,7 @@ export default function StatusPage({
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [supportURL, setSupportURL] = useState('')
+  const [copied, setCopied] = useState(false)
   const [err, setErr] = useState('')
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
@@ -26,7 +27,7 @@ export default function StatusPage({
       setDescription(v.description ?? '')
       setSupportURL(v.support_url ?? '')
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'failed')
+      setErr(e instanceof Error ? e.message : 'Could not load these settings.')
     }
   }, [])
 
@@ -43,116 +44,145 @@ export default function StatusPage({
       setNote('Saved.')
       load()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'failed')
+      setErr(e instanceof Error ? e.message : 'Could not save.')
     } finally {
       setBusy(false)
     }
   }
 
-  async function toggleBranding() {
-    if (!s) return
-    setErr('')
-    try {
-      await api.updateStatusPage({ hide_branding: !s.hide_branding })
-      load()
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'failed')
-    }
-  }
+  if (!s) return <div className="skeleton" style={{ height: 260 }} />
 
-  // Visibility is a property of the monitor, so it is saved immediately rather
-  // than batched with the page settings — a toggle that needs a separate Save
-  // is a toggle people forget to save.
-  async function toggleVisible(m: Monitor) {
-    await api.updateMonitor(m.id, { public: !m.public })
-    onChanged()
-  }
-
-  if (!s) return <p className="muted">Loading…</p>
+  const publicCount = monitors.filter((m) => m.public).length
 
   return (
     <>
-      <div className="card">
-        <div className="row" style={{ marginBottom: 14 }}>
-          <div className="grow">
-            <div className="name">Your public status page</div>
-            <div className="target">{s.public_url}</div>
+      <div className="panel">
+        <div className="spread" style={{ marginBottom: 'var(--s-4)' }}>
+          <div>
+            <h2 className="panel-title">Your public page</h2>
+            <p className="panel-note">{s.public_url}</p>
           </div>
-          <a className="chip" href={s.public_url} target="_blank" rel="noreferrer">
-            Open
-          </a>
+          <div className="row">
+            <button
+              className="ghost"
+              onClick={async () => {
+                await navigator.clipboard.writeText(s.public_url)
+                setCopied(true)
+                setTimeout(() => setCopied(false), 1600)
+              }}
+            >
+              {copied ? 'Copied' : 'Copy link'}
+            </button>
+            <a className="chip" href={s.public_url} target="_blank" rel="noreferrer">
+              Open
+            </a>
+          </div>
         </div>
 
         <div className="stack">
-          <input
-            placeholder="Page title (defaults to your organization name)"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            disabled={!canWrite}
-          />
-          <input
-            placeholder="Subtitle, e.g. Status of Northgate's hosted services"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            disabled={!canWrite}
-          />
-          <input
-            placeholder="Support link, e.g. https://yoursite.com/support"
-            value={supportURL}
-            onChange={(e) => setSupportURL(e.target.value)}
-            disabled={!canWrite}
-          />
+          <div className="field">
+            <label htmlFor="sp-title">Heading</label>
+            <input
+              id="sp-title"
+              placeholder="Defaults to your organization name"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              disabled={!canWrite}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="sp-desc">Subheading</label>
+            <input
+              id="sp-desc"
+              placeholder="Status of our hosted services"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              disabled={!canWrite}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="sp-support">Support link</label>
+            <input
+              id="sp-support"
+              placeholder="https://yoursite.com/support"
+              value={supportURL}
+              onChange={(e) => setSupportURL(e.target.value)}
+              disabled={!canWrite}
+            />
+            <span className="hint">Shown in the footer so visitors can reach you.</span>
+          </div>
+
           {canWrite && (
             <div className="row">
               <button onClick={save} disabled={busy}>
-                Save
+                {busy ? 'Saving…' : 'Save changes'}
               </button>
               <button
                 className="ghost"
-                onClick={toggleBranding}
                 disabled={!s.can_hide_branding}
-                title={
-                  s.can_hide_branding
-                    ? ''
-                    : 'Removing Pulse branding requires a paid plan'
-                }
+                title={s.can_hide_branding ? '' : 'Available on paid plans'}
+                onClick={async () => {
+                  await api.updateStatusPage({ hide_branding: !s.hide_branding })
+                  load()
+                }}
               >
-                {s.hide_branding ? 'Show "Powered by Pulse"' : 'Hide "Powered by Pulse"'}
+                {s.hide_branding ? 'Show Pulse branding' : 'Hide Pulse branding'}
               </button>
             </div>
           )}
         </div>
 
         {err && <p className="err">{err}</p>}
-        {note && (
-          <p className="muted" style={{ marginTop: 10, fontSize: 13 }}>
-            {note}
-          </p>
-        )}
+        {note && <p className="ok-note">{note}</p>}
       </div>
 
-      <p className="muted" style={{ marginTop: 24, fontSize: 13 }}>
-        Which monitors appear publicly
+      <p className="section-label">
+        {publicCount} of {monitors.length} monitors are shown publicly
       </p>
 
-      {monitors.map((m) => (
-        <div className="card" key={m.id} style={{ opacity: m.public ? 1 : 0.55 }}>
-          <div className="row">
-            <span className={`dot ${m.public ? 'up' : 'unknown'}`} />
-            <div className="grow">
-              <div className="name">{m.public_name || m.name}</div>
-              <div className="target">
-                {m.public ? 'visible on your status page' : 'hidden — monitored privately'}
-              </div>
-            </div>
-            {canWrite && (
-              <button className="ghost" onClick={() => toggleVisible(m)}>
-                {m.public ? 'Hide' : 'Show'}
-              </button>
-            )}
-          </div>
-        </div>
-      ))}
+      <div className="table-wrap">
+        <table className="data">
+          <thead>
+            <tr>
+              <th style={{ width: 28 }} />
+              <th>Monitor</th>
+              <th>On your page</th>
+              <th className="right" style={{ width: 90 }} />
+            </tr>
+          </thead>
+          <tbody>
+            {monitors.map((m) => (
+              <tr key={m.id} className={m.public ? '' : 'is-paused'}>
+                <td>
+                  <span className={`state ${m.public ? 'up' : 'unknown'}`} />
+                </td>
+                <td>
+                  <div className="cell-name">{m.public_name || m.name}</div>
+                  <div className="cell-target">{m.target}</div>
+                </td>
+                <td>
+                  <span className={`badge ${m.public ? 'up' : 'idle'}`}>
+                    {m.public ? 'visible' : 'private'}
+                  </span>
+                </td>
+                <td className="right">
+                  {canWrite && (
+                    <button
+                      className="quiet"
+                      onClick={async () => {
+                        await api.updateMonitor(m.id, { public: !m.public })
+                        onChanged()
+                      }}
+                    >
+                      {m.public ? 'Hide' : 'Show'}
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </>
   )
 }

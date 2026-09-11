@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { token, type Account } from './api'
+import { getChoice, setChoice, type ThemeChoice } from './theme'
 
 // Compact account control: avatar, name, plan badge, chevron, and a menu.
 // Sits in the header as identity rather than as content.
@@ -16,6 +17,7 @@ export default function AccountHeader({
 }) {
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [theme, setTheme] = useState<ThemeChoice>(getChoice)
   const ref = useRef<HTMLDivElement>(null)
 
   // Close on outside click and on Escape — a menu that does neither feels broken.
@@ -94,6 +96,26 @@ export default function AccountHeader({
           <button onClick={copyStatusURL}>
             {copied ? 'Link copied' : 'Copy status page link'}
           </button>
+
+          <div className="acct-sep" />
+
+          <div className="theme-row">
+            <span className="acct-meta">Appearance</span>
+            <div className="seg">
+              {(['auto', 'light', 'dark'] as ThemeChoice[]).map((t) => (
+                <button
+                  key={t}
+                  className={theme === t ? 'on' : ''}
+                  onClick={() => {
+                    setChoice(t)
+                    setTheme(t)
+                  }}
+                >
+                  {t === 'auto' ? 'Auto' : t === 'light' ? 'Day' : 'Night'}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <div className="acct-sep" />
 

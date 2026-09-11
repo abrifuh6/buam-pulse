@@ -77,7 +77,7 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 		Scan(&userID, &tenantID, &role, &hash)
 	// Same error for unknown email and wrong password: never reveal which.
 	if err != nil || !auth.CheckPassword(hash, in.Password) {
-		writeErr(w, 401, "invalid credentials")
+		writeErr(w, 401, "Invalid email or password.")
 		return
 	}
 	tok, _ := auth.IssueToken(s.Cfg.JWTSecret, userID, tenantID, role)

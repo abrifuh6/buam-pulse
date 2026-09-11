@@ -155,9 +155,19 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   const res = await fetch(`/api/v1${path}`, { ...init, headers })
 
+  // A 401 means two different things depending on where it came from. On the
+  // auth endpoints it means the credentials were wrong and there is no session
+  // to clear; anywhere else it means the token has expired and the user needs
+  // to sign in again. Treating them the same shows "session expired" to someone
+  // who simply mistyped a password.
   if (res.status === 401) {
-    token.clear()
-    throw new ApiError(401, 'session expired')
+    const isAuthAttempt = path.startsWith('/auth/')
+    if (!isAuthAttempt) {
+      token.clear()
+      throw new ApiError(401, 'Your session expired. Sign in again.')
+    }
+    const body = await res.json().catch(() => ({ error: 'Invalid email or password.' }))
+    throw new ApiError(401, body.error ?? 'Invalid email or password.')
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }))
@@ -173,6 +183,12 @@ export const api = {
       body: JSON.stringify({ company, email, password }),
     }),
 
+  forgotPassword: (email: string) =>
+    request<{ status: string }>('/auth/forgot', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
   login: (email: string, password: string) =>
     request<{ token: string }>('/auth/login', {
       method: 'POST',
@@ -186,6 +202,9 @@ export const api = {
     type: string
     target: string
     interval_seconds: number
+    keyword?: string
+    keyword_present?: boolean
+    alert_delay_seconds?: number
   }) => request<{ id: string }>('/monitors', { method: 'POST', body: JSON.stringify(m) }),
 
   deleteMonitor: (id: string) =>
@@ -202,6 +221,8 @@ export const api = {
       alert_delay_seconds: number
       public: boolean
       public_name: string
+      keyword: string
+      keyword_present: boolean
     }>,
   ) => request<void>(`/monitors/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
 

@@ -1,117 +1,631 @@
+/* ============================================================================
+   Pulse — design tokens
+   ----------------------------------------------------------------------------
+   Status colour is load-bearing in this product: green, amber and red mean
+   specific things. Two consequences run through everything below.
+
+   1. The neutral palette is deliberately desaturated and cool, so any saturated
+      colour on screen is carrying meaning rather than decorating.
+   2. The interactive accent sits OUTSIDE the status family. A periwinkle button
+      can never be misread as "this thing is healthy".
+   ========================================================================== */
+
 :root {
-  --bg: #0f1115;
-  --panel: #171a21;
-  --border: #262b36;
-  --text: #e6e8eb;
-  --muted: #8b929f;
-  --up: #2ea043;
-  --down: #e5534b;
-  --unknown: #8b929f;
-  --accent: #3b82f6;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Type scale — 12 / 13 / 15 / 18 / 24 / 32, body at 15 */
+  --t-xs:  12px;
+  --t-sm:  13px;
+  --t-md:  15px;
+  --t-lg:  18px;
+  --t-xl:  24px;
+  --t-2xl: 32px;
+
+  /* Spacing — 4px base, used everywhere instead of ad-hoc values */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+
+  --r-sm: 6px;
+  --r-md: 9px;
+  --r-lg: 12px;
+  --r-full: 999px;
+
+  --sans: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
+
+  --sidebar-w: 216px;
+
+  color-scheme: dark;
+}
+
+/* ----------------------------------------------------------------------------
+   Themes
+   ----------------------------------------------------------------------------
+   Status colour is load-bearing here, so it cannot simply be reused across
+   themes: the green that sings on a dark panel is too light to hold contrast
+   on white, and vice versa. Each theme gets its own tuned values rather than
+   one palette forced to work twice.
+
+   The interactive accent stays outside the status family in both themes, so a
+   button can never be misread as "this thing is healthy".
+   -------------------------------------------------------------------------- */
+
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  --ink-900: #0c1116;   /* page */
+  --ink-850: #0f161c;   /* sidebar */
+  --ink-800: #131a21;   /* panel */
+  --ink-700: #1b242d;   /* raised, hover */
+  --ink-600: #222d38;   /* pressed, selected */
+  --line:      #263039;
+  --line-soft: #1c252e;
+
+  --text:     #e4e9ee;
+  --text-dim: #aab6c2;
+  --muted:    #7d8b99;
+  --faint:    #5a6874;
+
+  --up:      #35c46b;
+  --up-bg:   rgba(53, 196, 107, 0.12);
+  --warn:    #e8a33d;
+  --warn-bg: rgba(232, 163, 61, 0.12);
+  --down:    #f0533f;
+  --down-bg: rgba(240, 83, 63, 0.12);
+  --idle:    #5a6874;
+  --idle-bg: rgba(90, 104, 116, 0.15);
+
+  --accent:       #6c8cff;
+  --accent-hover: #8099ff;
+  --accent-bg:    rgba(108, 140, 255, 0.12);
+  --accent-ink:   #0b1020;   /* text on an accent-filled button */
+
+  --shadow-menu: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+
+  /* Not pure white: a faint cool tint keeps large panels from glaring, and
+     gives the hairlines something to sit against. */
+  --ink-900: #f4f6f8;   /* page */
+  --ink-850: #eef1f4;   /* sidebar */
+  --ink-800: #ffffff;   /* panel */
+  --ink-700: #eaeef2;   /* raised, hover */
+  --ink-600: #dfe5eb;   /* pressed, selected */
+  --line:      #d8dee5;
+  --line-soft: #e7ebef;
+
+  --text:     #16202a;
+  --text-dim: #3d4d5c;
+  --muted:    #63737f;
+  --faint:    #93a1ad;
+
+  /* Darkened so they clear 4.5:1 against white panels */
+  --up:      #0f8a45;
+  --up-bg:   rgba(15, 138, 69, 0.10);
+  --warn:    #9a6206;
+  --warn-bg: rgba(154, 98, 6, 0.10);
+  --down:    #c2321d;
+  --down-bg: rgba(194, 50, 29, 0.10);
+  --idle:    #93a1ad;
+  --idle-bg: rgba(147, 161, 173, 0.16);
+
+  --accent:       #3557d8;
+  --accent-hover: #2a47bb;
+  --accent-bg:    rgba(53, 87, 216, 0.10);
+  --accent-ink:   #ffffff;
+
+  --shadow-menu: 0 12px 32px rgba(22, 32, 42, 0.14);
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--text); }
 
-.wrap { max-width: 880px; margin: 0 auto; padding: 32px 20px; }
-header.top { display: flex; justify-content: space-between; align-items: baseline;
-  margin-bottom: 28px; }
-h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
-.brand small { color: var(--muted); font-weight: 400; margin-left: 8px; }
+html, body, #root { height: 100%; }
 
-.card { background: var(--panel); border: 1px solid var(--border);
-  border-radius: 10px; padding: 18px; margin-bottom: 14px; }
+body {
+  margin: 0;
+  background: var(--ink-900);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: var(--t-md);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
 
-.row { display: flex; align-items: center; gap: 14px; }
-.row .grow { flex: 1; min-width: 0; }
-.name { font-weight: 600; }
-.target { color: var(--muted); font-size: 13px; overflow: hidden;
-  text-overflow: ellipsis; white-space: nowrap; }
+/* Numbers align. Every figure in the interface is tabular so columns of
+   latencies and percentages read as columns rather than ragged text. */
+.num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--t-sm);
+}
 
-.dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
-.dot.up { background: var(--up); }
-.dot.down { background: var(--down); }
-.dot.unknown { background: var(--unknown); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { color: var(--accent-hover); }
 
-.metric { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13px; }
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
 
-input, select, button { font: inherit; }
-input, select { background: #0d0f13; color: var(--text);
-  border: 1px solid var(--border); border-radius: 7px; padding: 9px 11px; }
-input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
 
-button { background: var(--accent); color: #fff; border: 0; border-radius: 7px;
-  padding: 9px 15px; cursor: pointer; }
-button:disabled { opacity: .5; cursor: not-allowed; }
-button.ghost { background: transparent; color: var(--muted);
-  border: 1px solid var(--border); }
-button.ghost:hover { color: var(--text); }
+/* ============================================================================
+   Shell
+   ========================================================================== */
 
-.form-grid { display: grid; grid-template-columns: 2fr 1fr 3fr auto auto;
-  gap: 10px; align-items: center; }
-.err { color: var(--down); font-size: 13px; margin: 10px 0 0; }
+.shell { display: flex; min-height: 100%; }
+
+.sidebar {
+  width: var(--sidebar-w);
+  flex: none;
+  background: var(--ink-850);
+  border-right: 1px solid var(--line-soft);
+  display: flex;
+  flex-direction: column;
+  padding: var(--s-5) var(--s-3) var(--s-3);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 0 var(--s-3) var(--s-6);
+  font-size: var(--t-lg);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.brand-mark { color: var(--up); }
+
+.nav { display: flex; flex-direction: column; gap: 2px; }
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  width: 100%;
+  padding: var(--s-2) var(--s-3);
+  background: transparent;
+  border: 0;
+  border-radius: var(--r-sm);
+  color: var(--muted);
+  font: inherit;
+  font-size: var(--t-md);
+  text-align: left;
+  cursor: pointer;
+}
+.nav-item:hover { background: var(--ink-700); color: var(--text-dim); }
+.nav-item[aria-current='page'] { background: var(--ink-600); color: var(--text); }
+.nav-item svg { flex: none; opacity: 0.85; }
+
+.nav-count {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: var(--t-xs);
+  color: var(--down);
+}
+
+.sidebar-foot { margin-top: auto; padding-top: var(--s-4); }
+
+.main { flex: 1; min-width: 0; padding: var(--s-5) var(--s-6) var(--s-7); }
+.main-inner { max-width: 1100px; }
+
+.page-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-4);
+  margin-bottom: var(--s-5);
+}
+.page-title { font-size: var(--t-xl); font-weight: 600; letter-spacing: -0.02em; margin: 0; }
+.page-sub { color: var(--muted); font-size: var(--t-sm); margin: 0; }
+
+/* ============================================================================
+   Status strip — the one bold moment. It answers "is anything wrong" before
+   anything else is read, and changes character completely when it is.
+   ========================================================================== */
+
+.strip {
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-4) var(--s-5);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--ink-800);
+  margin-bottom: var(--s-5);
+}
+.strip.is-down {
+  border-color: var(--down);
+  background: linear-gradient(90deg, var(--down-bg), transparent 60%), var(--ink-800);
+}
+.strip-headline { font-size: var(--t-lg); font-weight: 600; letter-spacing: -0.01em; }
+.strip.is-down .strip-headline { color: var(--down); }
+.strip-detail { color: var(--muted); font-size: var(--t-sm); }
+.strip-stats { margin-left: auto; display: flex; gap: var(--s-6); }
+.strip-stat { text-align: right; }
+.strip-stat b {
+  display: block;
+  font-family: var(--mono);
+  font-size: var(--t-lg);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.strip-stat span { color: var(--muted); font-size: var(--t-xs); }
+
+/* ============================================================================
+   Table — a real customer has forty monitors; cards show six.
+   ========================================================================== */
+
+.table-wrap {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: var(--ink-800);
+}
+
+table.data { width: 100%; border-collapse: collapse; }
+
+table.data th {
+  text-align: left;
+  font-size: var(--t-xs);
+  font-weight: 500;
+  color: var(--muted);
+  padding: var(--s-3) var(--s-4);
+  border-bottom: 1px solid var(--line);
+  background: var(--ink-850);
+  white-space: nowrap;
+}
+table.data th.right, table.data td.right { text-align: right; }
+
+table.data td {
+  padding: var(--s-3) var(--s-4);
+  border-bottom: 1px solid var(--line-soft);
+  vertical-align: middle;
+}
+table.data tbody tr:last-child td { border-bottom: 0; }
+table.data tbody tr.clickable { cursor: pointer; }
+table.data tbody tr.clickable:hover td { background: var(--ink-700); }
+table.data tbody tr.is-paused td { opacity: 0.5; }
+
+.cell-name { font-weight: 500; }
+.cell-target {
+  color: var(--muted);
+  font-size: var(--t-sm);
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Status dot with a soft ring, so it reads at a glance in a dense row */
+.state {
+  width: 8px; height: 8px; border-radius: 50%; flex: none; display: inline-block;
+}
+.state.up      { background: var(--up);   box-shadow: 0 0 0 3px var(--up-bg); }
+.state.down    { background: var(--down); box-shadow: 0 0 0 3px var(--down-bg); }
+.state.unknown { background: var(--idle); box-shadow: 0 0 0 3px var(--idle-bg); }
+.state.warn    { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-bg); }
+
+.badge {
+  display: inline-block;
+  padding: 2px var(--s-2);
+  border-radius: var(--r-full);
+  font-size: var(--t-xs);
+  font-weight: 500;
+}
+.badge.up   { background: var(--up-bg);   color: var(--up); }
+.badge.down { background: var(--down-bg); color: var(--down); }
+.badge.warn { background: var(--warn-bg); color: var(--warn); }
+.badge.idle { background: var(--idle-bg); color: var(--muted); }
+
+/* ============================================================================
+   Controls
+   ========================================================================== */
+
+input, select, textarea, button { font: inherit; }
+
+input, select, textarea {
+  background: var(--ink-900);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  padding: var(--s-2) var(--s-3);
+  font-size: var(--t-md);
+  width: 100%;
+}
+input::placeholder { color: var(--faint); }
+input:hover, select:hover { border-color: var(--ink-600); }
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+input:disabled, select:disabled { opacity: 0.5; cursor: not-allowed; }
+select { cursor: pointer; }
+
+button {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 0;
+  border-radius: var(--r-sm);
+  padding: var(--s-2) var(--s-4);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+button:hover { background: var(--accent-hover); }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+button.ghost {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+button.ghost:hover { background: var(--ink-700); color: var(--text); border-color: var(--ink-600); }
+
+button.quiet {
+  background: transparent;
+  color: var(--muted);
+  border: 0;
+  padding: var(--s-1) var(--s-2);
+}
+button.quiet:hover { background: var(--ink-700); color: var(--text); }
+
+button.danger { background: var(--down); color: #fff; }
+button.danger:hover { background: #ff6a56; }
+
+/* ============================================================================
+   Panels and forms — used by every settings screen
+   ========================================================================== */
+
+.panel {
+  background: var(--ink-800);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: var(--s-5);
+  margin-bottom: var(--s-4);
+}
+.panel-head { margin-bottom: var(--s-4); }
+.panel-title { font-size: var(--t-md); font-weight: 600; margin: 0; }
+.panel-note { color: var(--muted); font-size: var(--t-sm); margin: var(--s-1) 0 0; }
+
+.row { display: flex; align-items: center; gap: var(--s-3); }
+.grow { flex: 1; min-width: 0; }
+.stack { display: flex; flex-direction: column; gap: var(--s-3); }
+.spread { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); }
+
+.field { display: flex; flex-direction: column; gap: var(--s-2); }
+.field label { font-size: var(--t-sm); color: var(--text-dim); }
+.field .hint { font-size: var(--t-xs); color: var(--muted); }
+
+.section-label {
+  font-size: var(--t-sm);
+  color: var(--muted);
+  margin: var(--s-6) 0 var(--s-3);
+}
+
+.err {
+  color: var(--down);
+  font-size: var(--t-sm);
+  margin: var(--s-3) 0 0;
+}
+.ok-note { color: var(--up); font-size: var(--t-sm); margin: var(--s-3) 0 0; }
 .muted { color: var(--muted); }
-.center { max-width: 340px; margin: 12vh auto; }
-.stack { display: flex; flex-direction: column; gap: 10px; }
-.spark { display: flex; gap: 2px; align-items: flex-end; height: 22px; }
-.spark i { width: 3px; background: var(--up); border-radius: 1px; display: block; }
-.spark i.bad { background: var(--down); }
+.metric { color: var(--muted); font-size: var(--t-sm); }
 
-.usage { height: 6px; background: #0d0f13; border: 1px solid var(--border);
-  border-radius: 999px; overflow: hidden; }
-.usage i { display: block; height: 100%; border-radius: 999px; }
-.usage i.ok   { background: var(--up); }
-.usage i.warn { background: #e3a008; }
-.usage i.bad  { background: var(--down); }
+/* Empty states are an invitation to act, not a shrug */
+.empty {
+  border: 1px dashed var(--line);
+  border-radius: var(--r-lg);
+  padding: var(--s-7) var(--s-5);
+  text-align: center;
+  color: var(--muted);
+}
+.empty h3 { color: var(--text); font-size: var(--t-md); font-weight: 600; margin: 0 0 var(--s-2); }
+.empty p { margin: 0 auto var(--s-4); max-width: 44ch; font-size: var(--t-sm); }
 
-.account { background: var(--panel); border: 1px solid var(--border);
-  border-radius: 10px; padding: 14px 18px; margin-bottom: 18px; }
-.account .tenant { font-weight: 600; font-size: 15px; }
-.account .who { color: var(--muted); font-size: 13px; margin-top: 2px; }
+/* Skeletons instead of the word "Loading" */
+.skeleton {
+  background: linear-gradient(90deg, var(--ink-700), var(--ink-600), var(--ink-700));
+  background-size: 200% 100%;
+  border-radius: var(--r-sm);
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
 
-.chip { background: transparent; color: var(--muted);
-  border: 1px solid var(--border); border-radius: 999px;
-  padding: 5px 12px; font-size: 13px; cursor: pointer; }
-.chip:hover { color: var(--text); border-color: var(--muted); }
+/* Selectable chips, used for channel routing and monitor selection */
+.chips { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.chip {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  padding: var(--s-1) var(--s-3);
+  font-size: var(--t-sm);
+  cursor: pointer;
+}
+.chip:hover { color: var(--text); border-color: var(--ink-600); background: var(--ink-700); }
+.chip.on { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
 
-/* Account control */
+/* Usage meters on the plan screen */
+.meter { height: 4px; background: var(--ink-900); border-radius: var(--r-full); overflow: hidden; }
+.meter i { display: block; height: 100%; border-radius: var(--r-full); }
+.meter i.ok   { background: var(--up); }
+.meter i.warn { background: var(--warn); }
+.meter i.bad  { background: var(--down); }
+
+/* ============================================================================
+   Account control
+   ========================================================================== */
+
 .acct { position: relative; }
+.acct-btn {
+  display: flex; align-items: center; gap: var(--s-2);
+  width: 100%;
+  background: transparent; border: 1px solid transparent;
+  border-radius: var(--r-md);
+  padding: var(--s-2);
+  color: var(--text); cursor: pointer;
+}
+.acct-btn:hover { background: var(--ink-700); }
 
-.acct-btn { display: flex; align-items: center; gap: 8px;
-  background: transparent; border: 1px solid var(--border);
-  border-radius: 999px; padding: 5px 12px 5px 5px; color: var(--text);
-  cursor: pointer; }
-.acct-btn:hover { border-color: var(--muted); }
+.avatar {
+  width: 26px; height: 26px; border-radius: var(--r-sm);
+  background: var(--accent); color: var(--accent-ink);
+  font-size: var(--t-sm); font-weight: 600;
+  display: flex; align-items: center; justify-content: center; flex: none;
+}
+.acct-name {
+  font-size: var(--t-sm); font-weight: 500;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.acct-plan { font-size: var(--t-xs); color: var(--muted); }
+.chev { color: var(--muted); flex: none; margin-left: auto; }
 
-.avatar { width: 26px; height: 26px; border-radius: 50%;
-  background: var(--accent); color: #fff; font-size: 13px; font-weight: 600;
-  display: flex; align-items: center; justify-content: center; flex: none; }
+.acct-menu {
+  position: absolute; left: 0; bottom: calc(100% + var(--s-2));
+  min-width: 240px;
+  background: var(--ink-700);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: var(--s-1);
+  z-index: 20;
+  box-shadow: var(--shadow-menu);
+}
+.acct-menu-head {
+  padding: var(--s-3) var(--s-3) var(--s-3);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--s-1);
+}
+.acct-email { font-size: var(--t-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acct-role { font-size: var(--t-xs); color: var(--muted); margin-top: 2px; }
+.acct-menu button {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%;
+  background: transparent; border: 0; border-radius: var(--r-sm);
+  padding: var(--s-2) var(--s-3);
+  color: var(--text); font-size: var(--t-sm); text-align: left; cursor: pointer;
+}
+.acct-menu button:hover { background: var(--ink-600); }
+.acct-menu button.danger { background: transparent; color: var(--down); }
+.acct-menu button.danger:hover { background: var(--down-bg); }
+.acct-meta { color: var(--muted); font-size: var(--t-xs); }
+.acct-sep { height: 1px; background: var(--line); margin: var(--s-1) 0; }
 
-.acct-name { font-size: 14px; font-weight: 500; max-width: 160px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.acct-plan { font-size: 13px; color: var(--muted); }
-.chev { color: var(--muted); flex: none; }
+/* ============================================================================
+   Auth screens
+   ========================================================================== */
 
-.acct-menu { position: absolute; right: 0; top: calc(100% + 8px);
-  min-width: 240px; background: var(--panel); border: 1px solid var(--border);
-  border-radius: 10px; padding: 6px; z-index: 20;
-  box-shadow: 0 12px 32px rgba(0,0,0,.5); }
+.auth { display: grid; place-items: center; min-height: 100vh; padding: var(--s-5); }
+.auth-card { width: 100%; max-width: 360px; }
+.auth-brand {
+  font-size: var(--t-xl); font-weight: 600; letter-spacing: -0.02em;
+  margin: 0 0 var(--s-1);
+}
+.auth-sub { color: var(--muted); font-size: var(--t-sm); margin: 0 0 var(--s-5); }
 
-.acct-menu-head { padding: 10px 12px 12px; border-bottom: 1px solid var(--border);
-  margin-bottom: 6px; }
-.acct-email { font-size: 13px; overflow: hidden; text-overflow: ellipsis;
-  white-space: nowrap; }
-.acct-role { font-size: 12px; color: var(--muted); margin-top: 2px; }
+@media (max-width: 760px) {
+  .shell { flex-direction: column; }
+  .sidebar {
+    width: 100%; height: auto; position: static;
+    flex-direction: row; align-items: center; overflow-x: auto;
+    padding: var(--s-3);
+  }
+  .brand { padding: 0 var(--s-3) 0 0; }
+  .nav { flex-direction: row; }
+  .sidebar-foot { margin-top: 0; margin-left: auto; padding-top: 0; }
+  .main { padding: var(--s-4); }
+  .strip { flex-wrap: wrap; }
+  .strip-stats { margin-left: 0; width: 100%; }
+}
 
-.acct-menu button { display: flex; align-items: center; justify-content: space-between;
-  width: 100%; background: transparent; border: 0; border-radius: 7px;
-  padding: 9px 12px; color: var(--text); font-size: 14px; text-align: left;
-  cursor: pointer; }
-.acct-menu button:hover { background: #1f232c; }
-.acct-menu button.danger { color: var(--down); }
-.acct-meta { color: var(--muted); font-size: 13px; }
-.acct-sep { height: 1px; background: var(--border); margin: 6px 0; }
+/* Appearance switch — a segmented control, because the three options are
+   mutually exclusive and equally weighted. A dropdown would hide the choice
+   and a single toggle could not express "follow the system". */
+.theme-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s-3); padding: var(--s-2) var(--s-3);
+}
+.seg {
+  display: flex; background: var(--ink-900);
+  border: 1px solid var(--line); border-radius: var(--r-sm); padding: 2px;
+}
+.seg button {
+  background: transparent; border: 0; border-radius: 4px;
+  padding: 3px var(--s-2);
+  color: var(--muted); font-size: var(--t-xs); cursor: pointer;
+  width: auto; justify-content: center;
+}
+.seg button:hover { color: var(--text); background: transparent; }
+.seg button.on { background: var(--ink-700); color: var(--text); }
 
-.chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.chip.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+/* Side sheet — a monitor has eleven settings, which is too many for an inline
+   row and too few to deserve its own page. Slides from the right so the list
+   stays visible behind it and context is not lost. */
+.sheet-backdrop {
+  position: fixed; inset: 0; z-index: 40;
+  background: rgba(4, 8, 12, 0.55);
+  display: flex; justify-content: flex-end;
+}
+[data-theme='light'] .sheet-backdrop { background: rgba(22, 32, 42, 0.28); }
+
+.sheet {
+  width: min(460px, 100%);
+  background: var(--ink-800);
+  border-left: 1px solid var(--line);
+  display: flex; flex-direction: column;
+  height: 100%;
+}
+.sheet-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: var(--s-4) var(--s-5);
+  border-bottom: 1px solid var(--line);
+}
+.sheet-body { padding: var(--s-5); overflow-y: auto; flex: 1; }
+.sheet-foot {
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: var(--s-4) var(--s-5);
+  border-top: 1px solid var(--line);
+}
+
+/* Side sheet — a monitor has eleven settings, which is too many for an inline
+   row and too few to deserve its own page. Slides from the right so the list
+   stays visible behind it and context is not lost. */
+.sheet-backdrop {
+  position: fixed; inset: 0; z-index: 40;
+  background: rgba(4, 8, 12, 0.55);
+  display: flex; justify-content: flex-end;
+}
+[data-theme='light'] .sheet-backdrop { background: rgba(22, 32, 42, 0.28); }
+
+.sheet {
+  width: min(460px, 100%);
+  background: var(--ink-800);
+  border-left: 1px solid var(--line);
+  display: flex; flex-direction: column;
+  height: 100%;
+}
+.sheet-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: var(--s-4) var(--s-5);
+  border-bottom: 1px solid var(--line);
+}
+.sheet-body { padding: var(--s-5); overflow-y: auto; flex: 1; }
+.sheet-foot {
+  display: flex; align-items: center; gap: var(--s-2);
+  padding: var(--s-4) var(--s-5);
+  border-top: 1px solid var(--line);
+}

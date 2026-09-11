@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, currentRole, type MaintenanceWindow, type Monitor } from './api'
 
-// datetime-local gives a value with no timezone; the browser interprets it as
-// local time, and toISOString converts to UTC for the API. Getting this wrong
-// is how a maintenance window ends up suppressing alerts eight hours late.
+// datetime-local has no timezone; the browser reads it as local time and
+// toISOString converts to UTC for the API. Getting this wrong is how a window
+// suppresses alerts eight hours late.
 function toLocalInput(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
@@ -20,7 +20,7 @@ function fmtRange(startISO: string, endISO: string): string {
     hour: 'numeric',
     minute: '2-digit',
   }
-  return `${s.toLocaleString(undefined, opts)} → ${e.toLocaleString(undefined, opts)}`
+  return `${s.toLocaleString(undefined, opts)} to ${e.toLocaleString(undefined, opts)}`
 }
 
 export default function Maintenance({ monitors }: { monitors: Monitor[] }) {
@@ -33,12 +33,15 @@ export default function Maintenance({ monitors }: { monitors: Monitor[] }) {
   const [selected, setSelected] = useState<string[]>([])
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
     try {
       setWindows(await api.listMaintenance())
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'failed')
+      setErr(e instanceof Error ? e.message : 'Could not load maintenance windows.')
+    } finally {
+      setLoading(false)
     }
   }, [])
 
@@ -60,67 +63,86 @@ export default function Maintenance({ monitors }: { monitors: Monitor[] }) {
       setSelected([])
       load()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'failed')
+      setErr(e instanceof Error ? e.message : 'Could not schedule this window.')
     } finally {
       setBusy(false)
     }
   }
 
-  function toggle(id: string) {
-    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
-  }
+  if (loading) return <div className="skeleton" style={{ height: 220 }} />
 
   return (
     <>
       {canWrite && (
-        <div className="card">
+        <div className="panel">
+          <div className="panel-head">
+            <h2 className="panel-title">Schedule a window</h2>
+            <p className="panel-note">
+              Alerts stay quiet and the downtime is recorded as planned, so it does not count
+              against your published uptime.
+            </p>
+          </div>
+
           <div className="stack">
-            <input
-              placeholder="What's happening? e.g. Database upgrade"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-            <div className="row">
-              <label className="metric" style={{ width: 50 }}>
-                From
-              </label>
+            <div className="field">
+              <label htmlFor="mw-title">What is happening</label>
               <input
-                type="datetime-local"
-                value={starts}
-                onChange={(e) => setStarts(e.target.value)}
-              />
-              <label className="metric" style={{ width: 30 }}>
-                To
-              </label>
-              <input
-                type="datetime-local"
-                value={ends}
-                onChange={(e) => setEnds(e.target.value)}
+                id="mw-title"
+                placeholder="Database upgrade"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
               />
             </div>
 
-            <div>
-              <div className="metric" style={{ marginBottom: 8 }}>
-                {selected.length === 0
-                  ? 'Applies to all monitors'
-                  : `Applies to ${selected.length} selected`}
+            <div className="row">
+              <div className="field grow">
+                <label htmlFor="mw-from">Starts</label>
+                <input
+                  id="mw-from"
+                  type="datetime-local"
+                  value={starts}
+                  onChange={(e) => setStarts(e.target.value)}
+                />
               </div>
+              <div className="field grow">
+                <label htmlFor="mw-to">Ends</label>
+                <input
+                  id="mw-to"
+                  type="datetime-local"
+                  value={ends}
+                  onChange={(e) => setEnds(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="field">
+              <label>Applies to</label>
               <div className="chips">
                 {monitors.map((m) => (
                   <button
                     key={m.id}
+                    type="button"
                     className={`chip ${selected.includes(m.id) ? 'on' : ''}`}
-                    onClick={() => toggle(m.id)}
+                    onClick={() =>
+                      setSelected((s) =>
+                        s.includes(m.id) ? s.filter((x) => x !== m.id) : [...s, m.id],
+                      )
+                    }
                   >
                     {m.name}
                   </button>
                 ))}
               </div>
+              <span className="hint">
+                {selected.length === 0
+                  ? 'Nothing selected, so every monitor is covered.'
+                  : `${selected.length} selected.`}
+              </span>
             </div>
 
             <div>
               <button onClick={create} disabled={busy || !title}>
-                Schedule maintenance
+                {busy ? 'Scheduling…' : 'Schedule'}
               </button>
             </div>
           </div>
@@ -128,48 +150,64 @@ export default function Maintenance({ monitors }: { monitors: Monitor[] }) {
         </div>
       )}
 
-      {!windows.length && (
-        <p className="muted">
-          No maintenance scheduled. During a window, alerts are suppressed and the downtime is
-          marked as planned rather than counted against your uptime.
-        </p>
-      )}
-
-      {windows.map((w) => (
-        <div
-          className="card"
-          key={w.id}
-          style={w.active ? { borderColor: 'var(--accent)' } : undefined}
-        >
-          <div className="row">
-            <span className={`dot ${w.active ? 'up' : 'unknown'}`} />
-            <div className="grow">
-              <div className="name">
-                {w.title}
-                {w.active && <span className="metric"> · in progress</span>}
-              </div>
-              <div className="target">
-                {fmtRange(w.starts_at, w.ends_at)} ·{' '}
-                {w.monitor_ids.length === 0
-                  ? 'all monitors'
-                  : `${w.monitor_ids.length} monitor${w.monitor_ids.length > 1 ? 's' : ''}`}
-              </div>
-            </div>
-            {canWrite && (
-              <button
-                className="ghost"
-                onClick={async () => {
-                  if (!confirm(`Delete "${w.title}"?`)) return
-                  await api.deleteMaintenance(w.id)
-                  load()
-                }}
-              >
-                Delete
-              </button>
-            )}
-          </div>
+      {!windows.length ? (
+        <div className="empty">
+          <h3>No planned work</h3>
+          <p>
+            Schedule a window before a deploy or a migration and Pulse will keep quiet while it
+            runs, instead of paging you about downtime you caused on purpose.
+          </p>
         </div>
-      ))}
+      ) : (
+        <div className="table-wrap">
+          <table className="data">
+            <thead>
+              <tr>
+                <th style={{ width: 28 }} />
+                <th>Window</th>
+                <th>Covers</th>
+                <th className="right" style={{ width: 100 }} />
+              </tr>
+            </thead>
+            <tbody>
+              {windows.map((w) => (
+                <tr key={w.id}>
+                  <td>
+                    <span className={`state ${w.active ? 'warn' : 'unknown'}`} />
+                  </td>
+                  <td>
+                    <div className="cell-name">
+                      {w.title}
+                      {w.active && <span className="badge warn" style={{ marginLeft: 8 }}>in progress</span>}
+                    </div>
+                    <div className="cell-target">{fmtRange(w.starts_at, w.ends_at)}</div>
+                  </td>
+                  <td className="metric">
+                    {w.monitor_ids.length === 0
+                      ? 'all monitors'
+                      : `${w.monitor_ids.length} monitor${w.monitor_ids.length > 1 ? 's' : ''}`}
+                  </td>
+                  <td className="right">
+                    {canWrite && (
+                      <button
+                        className="quiet"
+                        style={{ color: 'var(--down)' }}
+                        onClick={async () => {
+                          if (!confirm(`Delete "${w.title}"?`)) return
+                          await api.deleteMaintenance(w.id)
+                          load()
+                        }}
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </>
   )
 }

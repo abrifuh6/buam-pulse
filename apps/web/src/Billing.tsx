@@ -9,18 +9,20 @@ function interval(seconds: number): string {
   return seconds >= 60 ? `${seconds / 60} min` : `${seconds}s`
 }
 
-function UsageRow({ label, used, cap }: { label: string; used: number; cap: number }) {
+// The bar turns amber at 80% so a limit is visible before it is hit, not after
+// a creation has already been refused.
+function Usage({ label, used, cap }: { label: string; used: number; cap: number }) {
   const pct = Math.min(100, (used / cap) * 100)
   const state = pct >= 100 ? 'bad' : pct >= 80 ? 'warn' : 'ok'
   return (
-    <div style={{ marginBottom: 14 }}>
-      <div className="row" style={{ marginBottom: 6 }}>
-        <span className="grow">{label}</span>
-        <span className="metric">
-          {used} of {cap}
+    <div style={{ marginBottom: 'var(--s-4)' }}>
+      <div className="spread" style={{ marginBottom: 'var(--s-2)' }}>
+        <span>{label}</span>
+        <span className="num">
+          {used} / {cap}
         </span>
       </div>
-      <div className="usage">
+      <div className="meter">
         <i className={state} style={{ width: `${pct}%` }} />
       </div>
     </div>
@@ -29,6 +31,7 @@ function UsageRow({ label, used, cap }: { label: string; used: number; cap: numb
 
 export default function Billing({ account }: { account: Account | null }) {
   const isOwner = currentRole() === 'owner'
+
   const [current, setCurrent] = useState<PlanUsage | null>(null)
   const [all, setAll] = useState<Plan[]>([])
   const [err, setErr] = useState('')
@@ -40,29 +43,25 @@ export default function Billing({ account }: { account: Account | null }) {
         setCurrent(c)
         setAll(a)
       })
-      .catch((e) => setErr(e instanceof Error ? e.message : 'failed'))
+      .catch((e) => setErr(e instanceof Error ? e.message : 'Could not load your plan.'))
   }, [])
 
   useEffect(load, [load])
 
-  // A tenant with no Stripe customer has never paid, so there is nothing for
-  // the portal to manage — they go through Checkout. Everyone else goes to the
-  // portal, which handles upgrades, downgrades, cancellation, card changes and
-  // invoices in one place. Building those flows ourselves would duplicate a
-  // lot of edge-case handling (proration, failed cards, tax) for no benefit.
+  // A tenant with no Stripe customer has never paid, so there is nothing for the
+  // portal to manage and they go through checkout. Everyone else goes to the
+  // portal, which handles upgrades, downgrades, cards and invoices in one place.
+  // Rebuilding that ourselves would mean implementing proration and refunds.
   async function choose(planCode: string) {
     setErr('')
     setBusy(planCode)
     try {
-      if (account?.plan.has_billing) {
-        const { url } = await api.billingPortal()
-        window.location.href = url
-      } else {
-        const { url } = await api.checkout(planCode)
-        window.location.href = url
-      }
+      const { url } = account?.plan.has_billing
+        ? await api.billingPortal()
+        : await api.checkout(planCode)
+      window.location.href = url
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'failed')
+      setErr(e instanceof Error ? e.message : 'Could not open billing.')
       setBusy('')
     }
   }
@@ -74,110 +73,123 @@ export default function Billing({ account }: { account: Account | null }) {
       const { url } = await api.billingPortal()
       window.location.href = url
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'failed')
+      setErr(e instanceof Error ? e.message : 'Could not open billing.')
       setBusy('')
     }
   }
 
-  if (err && !current) return <p className="err">{err}</p>
-  if (!current) return <p className="muted">Loading…</p>
+  if (!current) return <div className="skeleton" style={{ height: 300 }} />
 
   const pastDue = account?.plan.subscription_status === 'past_due'
+  const ending = account?.plan.cancel_at_period_end
 
   return (
     <>
-      {account?.plan.cancel_at_period_end && (
-        <div className="card" style={{ borderColor: 'var(--muted)' }}>
-          <span className="muted">
-            Your subscription is set to end at the close of the current billing
-            period. You keep {current.plan.name} access until then.
-          </span>
-        </div>
-      )}
-
       {pastDue && (
-        <div className="card" style={{ borderColor: 'var(--down)' }}>
-          <div className="row">
-            <span className="grow" style={{ color: 'var(--down)' }}>
-              Your last payment failed. Update your card to avoid losing your plan.
-            </span>
-            {isOwner && (
-              <button onClick={manage} disabled={busy !== ''}>
-                Update payment
-              </button>
-            )}
+        <div className="panel" style={{ borderColor: 'var(--down)' }}>
+          <div className="spread">
+            <div>
+              <h2 className="panel-title" style={{ color: 'var(--down)' }}>
+                Your last payment failed
+              </h2>
+              <p className="panel-note">
+                Update your card to keep {current.plan.name}. Stripe will retry for a few days
+                before the plan drops.
+              </p>
+            </div>
+            {isOwner && <button onClick={manage}>Update card</button>}
           </div>
         </div>
       )}
 
-      <div className="card">
-        <div className="row" style={{ marginBottom: 18 }}>
-          <div className="grow">
-            <div className="name">{current.plan.name} plan</div>
-            <div className="target">
-              {money(current.plan.price_cents)} · checks as often as every{' '}
-              {interval(current.plan.min_interval)} · {current.plan.retention_days} days of
-              history
-            </div>
+      {ending && !pastDue && (
+        <div className="panel">
+          <p className="panel-note" style={{ margin: 0 }}>
+            Your subscription ends when the current billing period closes. You keep{' '}
+            {current.plan.name} until then.
+          </p>
+        </div>
+      )}
+
+      <div className="panel">
+        <div className="spread" style={{ marginBottom: 'var(--s-5)' }}>
+          <div>
+            <h2 className="panel-title">{current.plan.name}</h2>
+            <p className="panel-note">
+              {money(current.plan.price_cents)}, checks as often as every{' '}
+              {interval(current.plan.min_interval)}, {current.plan.retention_days} days of history
+            </p>
           </div>
           {isOwner && account?.plan.has_billing && (
             <button className="ghost" onClick={manage} disabled={busy !== ''}>
-              {busy === 'portal' ? '…' : 'Manage billing'}
+              {busy === 'portal' ? 'Opening…' : 'Manage billing'}
             </button>
           )}
         </div>
 
-        <UsageRow label="Monitors" used={current.usage.monitors} cap={current.plan.max_monitors} />
-        <UsageRow label="Team members" used={current.usage.members} cap={current.plan.max_members} />
-        <UsageRow
-          label="Alert channels"
-          used={current.usage.channels}
-          cap={current.plan.max_channels}
-        />
+        <Usage label="Monitors" used={current.usage.monitors} cap={current.plan.max_monitors} />
+        <Usage label="Team members" used={current.usage.members} cap={current.plan.max_members} />
+        <Usage label="Alert channels" used={current.usage.channels} cap={current.plan.max_channels} />
       </div>
 
       {err && <p className="err">{err}</p>}
 
-      <p className="muted" style={{ marginTop: 24, fontSize: 13 }}>
-        Plans
-      </p>
+      <p className="section-label">Plans</p>
 
-      {all.map((p) => {
-        const isCurrent = p.code === current.plan.code
-        const isUpgrade = p.price_cents > current.plan.price_cents
-        return (
-          <div className="card" key={p.code} style={{ opacity: isCurrent ? 1 : 0.85 }}>
-            <div className="row">
-              <div className="grow">
-                <div className="name">
-                  {p.name}
-                  {isCurrent && <span className="metric"> · current</span>}
-                </div>
-                <div className="target">
-                  {p.max_monitors} monitors · {interval(p.min_interval)} minimum ·{' '}
-                  {p.max_members} {p.max_members === 1 ? 'member' : 'members'} ·{' '}
-                  {p.retention_days}d history
-                </div>
-              </div>
-              <span className="metric" style={{ fontSize: 15 }}>
-                {money(p.price_cents)}
-              </span>
-              {!isCurrent && isOwner && (
-                <button
-                  className={isUpgrade ? '' : 'ghost'}
-                  onClick={() => choose(p.code)}
-                  disabled={busy !== ''}
-                >
-                  {busy === p.code ? '…' : isUpgrade ? 'Upgrade' : 'Downgrade'}
-                </button>
-              )}
-            </div>
-          </div>
-        )
-      })}
+      <div className="table-wrap">
+        <table className="data">
+          <thead>
+            <tr>
+              <th>Plan</th>
+              <th className="right">Monitors</th>
+              <th className="right">Fastest check</th>
+              <th className="right">Members</th>
+              <th className="right">History</th>
+              <th className="right">Price</th>
+              <th className="right" style={{ width: 120 }} />
+            </tr>
+          </thead>
+          <tbody>
+            {all.map((p) => {
+              const isCurrent = p.code === current.plan.code
+              const isUpgrade = p.price_cents > current.plan.price_cents
+              return (
+                <tr key={p.code}>
+                  <td>
+                    <div className="cell-name">
+                      {p.name}
+                      {isCurrent && (
+                        <span className="badge up" style={{ marginLeft: 8 }}>
+                          current
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="right num">{p.max_monitors}</td>
+                  <td className="right num">{interval(p.min_interval)}</td>
+                  <td className="right num">{p.max_members}</td>
+                  <td className="right num">{p.retention_days}d</td>
+                  <td className="right num">{money(p.price_cents)}</td>
+                  <td className="right">
+                    {!isCurrent && isOwner && (
+                      <button
+                        className={isUpgrade ? '' : 'ghost'}
+                        onClick={() => choose(p.code)}
+                        disabled={busy !== ''}
+                      >
+                        {busy === p.code ? '…' : isUpgrade ? 'Upgrade' : 'Downgrade'}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
 
       {!isOwner && (
-        <p className="muted" style={{ marginTop: 14, fontSize: 13 }}>
+        <p className="metric" style={{ marginTop: 'var(--s-4)' }}>
           Only the account owner can change the plan.
         </p>
       )}
