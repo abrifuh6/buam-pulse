@@ -148,3 +148,9 @@
 - TLS expiry recorded per monitor; warning email once per certificate (ssl_alerted_for), NOT an incident — the site is up, and opening one would corrupt uptime figures
 - pulse_cert_days_remaining gauge for Prometheus alerting
 - SSRF guard made an explicit option rather than unconditional, so tests can target 127.0.0.1 deliberately instead of the guard being weakened to allow localhost
+
+## 2026-09-11 — Phase 3.7 step 2: maintenance windows and alert delay
+- Maintenance windows suppress alerts for selected monitors (or the whole tenant when none are selected); incidents inside a window are recorded as planned rather than hidden, so headline uptime excludes them but the record survives for a stricter calculation
+- Recovery is only announced if the failure was — a recovery notice for an outage nobody heard about is noise
+- Per-monitor alert_delay_seconds: a swept timer queues the notification once the incident has been open long enough. A timer rather than an in-process sleep, because a sleep loses every pending alert when the pod restarts — exactly when the alert matters most
+- Verified: same failure produced a planned, silent incident inside a window and an alerting one outside it
