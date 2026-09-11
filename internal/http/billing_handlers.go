@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/stripe/stripe-go/v81"
 	billingportal "github.com/stripe/stripe-go/v81/billingportal/session"
@@ -19,7 +20,15 @@ import (
 
 type checkoutReq struct {
 	PlanCode string `json:"plan_code"`
+	// monthly | quarterly | yearly. Defaults to monthly when omitted.
+	Period string `json:"period"`
 }
+
+// Paid plans start with a trial. Fourteen days is the category norm: long
+// enough to see a real incident on a real site, short enough that the decision
+// doesn't get forgotten. A card is collected up front, so conversion needs no
+// second action from the customer.
+const trialDays = 14
 
 func (s *Server) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 	c := claimsFrom(r)
@@ -29,9 +38,20 @@ func (s *Server) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	period := in.Period
+	column := "stripe_price_id"
+	switch period {
+	case "quarterly":
+		column = "stripe_price_quarterly"
+	case "yearly":
+		column = "stripe_price_yearly"
+	default:
+		period = "monthly"
+	}
+
 	var priceID *string
 	if err := s.DB.QueryRow(r.Context(),
-		`SELECT stripe_price_id FROM plans WHERE code=$1`, in.PlanCode).Scan(&priceID); err != nil {
+		"SELECT "+column+" FROM plans WHERE code=$1", in.PlanCode).Scan(&priceID); err != nil {
 		writeErr(w, 404, "unknown plan")
 		return
 	}
@@ -83,14 +103,17 @@ func (s *Server) CreateCheckout(w http.ResponseWriter, r *http.Request) {
 		// tenant and plan a completed session belongs to without a lookup
 		// table of its own.
 		SubscriptionData: &stripe.CheckoutSessionSubscriptionDataParams{
+			TrialPeriodDays: stripe.Int64(trialDays),
 			Metadata: map[string]string{
 				"pulse_tenant_id": c.TenantID,
 				"pulse_plan":      in.PlanCode,
+				"pulse_period":    period,
 			},
 		},
 		Metadata: map[string]string{
 			"pulse_tenant_id": c.TenantID,
 			"pulse_plan":      in.PlanCode,
+			"pulse_period":    period,
 		},
 		SuccessURL: stripe.String(s.Cfg.DashboardURL + "/?billing=success"),
 		CancelURL:  stripe.String(s.Cfg.DashboardURL + "/?billing=cancelled"),
@@ -210,8 +233,9 @@ func (s *Server) handleStripeEvent(r *http.Request, event stripe.Event) error {
 		}
 		_, err := s.DB.Exec(r.Context(), `
 			UPDATE tenants SET plan_code=$2, stripe_subscription_id=NULLIF($3,''),
-			                   subscription_status='active'
-			WHERE id=$1`, tenantID, planCode, subID)
+			                   subscription_status='trialing',
+			                   billing_period=COALESCE(NULLIF($4,''), 'monthly')
+			WHERE id=$1`, tenantID, planCode, subID, sess.Metadata["pulse_period"])
 		return err
 
 	case "customer.subscription.updated", "customer.subscription.created":
@@ -267,30 +291,52 @@ func (s *Server) applySubscription(r *http.Request, sub stripe.Subscription) err
 	}
 	priceID := sub.Items.Data[0].Price.ID
 
-	var planCode string
-	if err := s.DB.QueryRow(r.Context(),
-		`SELECT code FROM plans WHERE stripe_price_id=$1`, priceID).Scan(&planCode); err != nil {
+	// Any of the plan's three prices identifies it. Matching on all three
+	// columns means a customer who switches period in the portal keeps their
+	// plan instead of appearing to have no plan at all.
+	var planCode, period string
+	if err := s.DB.QueryRow(r.Context(), `
+		SELECT code,
+		       CASE WHEN stripe_price_quarterly = $1 THEN 'quarterly'
+		            WHEN stripe_price_yearly    = $1 THEN 'yearly'
+		            ELSE 'monthly' END
+		FROM plans
+		WHERE stripe_price_id = $1
+		   OR stripe_price_quarterly = $1
+		   OR stripe_price_yearly = $1`, priceID).Scan(&planCode, &period); err != nil {
 		slog.Warn("subscription price has no matching plan", "price", priceID)
 		return nil
 	}
 
-	// A subscription that is not active or trialing gets no plan benefits.
+	// A trialing subscription gets the full plan: that is the point of a trial.
+	// Anything past due, unpaid or cancelled falls back to free.
 	status := string(sub.Status)
 	effective := planCode
 	if status != "active" && status != "trialing" {
 		effective = "free"
 	}
 
+	var trialEnd *time.Time
+	if sub.TrialEnd > 0 {
+		t := time.Unix(sub.TrialEnd, 0)
+		trialEnd = &t
+	}
+
 	_, err := s.DB.Exec(r.Context(), `
 		UPDATE tenants SET plan_code=$2, subscription_status=$3,
 		                   stripe_subscription_id=$4,
 		                   cancel_at_period_end=$6,
+		                   billing_period=$7,
+		                   trial_ends_at=$8,
+		                   billing_period=$7,
+		                   trial_ends_at=$8,
 		                   current_period_end=to_timestamp($5)
 		WHERE stripe_customer_id=$1
 		  -- Accept an event for the tracked subscription, or adopt one if we are
 		  -- tracking none yet (first checkout). Ignore events about other
 		  -- subscriptions belonging to the same customer.
 		  AND (stripe_subscription_id IS NULL OR stripe_subscription_id=$4)`,
-		sub.Customer.ID, effective, status, sub.ID, sub.CurrentPeriodEnd, sub.CancelAtPeriodEnd)
+		sub.Customer.ID, effective, status, sub.ID, sub.CurrentPeriodEnd, sub.CancelAtPeriodEnd,
+		period, trialEnd)
 	return err
 }

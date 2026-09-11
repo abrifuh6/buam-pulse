@@ -45,31 +45,43 @@ func main() {
 	defer pool.Close()
 
 	rows, err := pool.Query(ctx, `
-		SELECT code, name, price_cents FROM plans
-		WHERE price_cents > 0 ORDER BY sort_order`)
+		SELECT code, name, price_cents, price_cents_quarterly, price_cents_yearly
+		FROM plans WHERE price_cents > 0 ORDER BY sort_order`)
 	if err != nil {
 		log.Error("read plans", "err", err)
 		os.Exit(1)
 	}
 	type planRow struct {
-		code, name string
-		cents      int64
+		code, name                 string
+		monthly, quarterly, yearly int64
 	}
 	var toCreate []planRow
 	for rows.Next() {
 		var p planRow
-		if rows.Scan(&p.code, &p.name, &p.cents) == nil {
+		if rows.Scan(&p.code, &p.name, &p.monthly, &p.quarterly, &p.yearly) == nil {
 			toCreate = append(toCreate, p)
 		}
 	}
 	rows.Close()
 
+	// Stripe models a quarterly price as a monthly interval with a count of 3,
+	// not as its own interval type.
+	periods := []struct {
+		name     string
+		column   string
+		interval stripe.PriceRecurringInterval
+		count    int64
+	}{
+		{"monthly", "stripe_price_id", stripe.PriceRecurringIntervalMonth, 1},
+		{"quarterly", "stripe_price_quarterly", stripe.PriceRecurringIntervalMonth, 3},
+		{"yearly", "stripe_price_yearly", stripe.PriceRecurringIntervalYear, 1},
+	}
+
 	for _, p := range toCreate {
-		// Find an existing product for this plan code before making another.
 		var productID string
 		search := product.Search(&stripe.ProductSearchParams{
 			SearchParams: stripe.SearchParams{
-				Query: `metadata['pulse_plan']:'` + p.code + `'`,
+				Query: "metadata['pulse_plan']:'" + p.code + "'",
 			},
 		})
 		for search.Next() {
@@ -91,46 +103,66 @@ func main() {
 			log.Info("created product", "plan", p.code, "id", productID)
 		}
 
-		// Prices are immutable in Stripe: changing an amount means a new price,
-		// not an edit. Reuse the active one if it already matches.
-		var priceID string
-		pi := price.List(&stripe.PriceListParams{
-			Product: stripe.String(productID),
-			Active:  stripe.Bool(true),
-		})
-		for pi.Next() {
-			pr := pi.Price()
-			if pr.UnitAmount == p.cents && pr.Recurring != nil &&
-				pr.Recurring.Interval == stripe.PriceRecurringIntervalMonth {
-				priceID = pr.ID
-				break
+		for _, period := range periods {
+			var cents int64
+			switch period.name {
+			case "monthly":
+				cents = p.monthly
+			case "quarterly":
+				cents = p.quarterly
+			case "yearly":
+				cents = p.yearly
 			}
-		}
+			if cents == 0 {
+				continue
+			}
 
-		if priceID == "" {
-			pr, err := price.New(&stripe.PriceParams{
-				Product:    stripe.String(productID),
-				Currency:   stripe.String(string(stripe.CurrencyUSD)),
-				UnitAmount: stripe.Int64(p.cents),
-				Recurring: &stripe.PriceRecurringParams{
-					Interval: stripe.String(string(stripe.PriceRecurringIntervalMonth)),
-				},
-				Metadata: map[string]string{"pulse_plan": p.code},
+			// Prices are immutable in Stripe: changing an amount means a new
+			// price, not an edit. Reuse an active one that already matches.
+			var priceID string
+			pi := price.List(&stripe.PriceListParams{
+				Product: stripe.String(productID),
+				Active:  stripe.Bool(true),
 			})
-			if err != nil {
-				log.Error("create price", "plan", p.code, "err", err)
+			for pi.Next() {
+				pr := pi.Price()
+				if pr.UnitAmount == cents && pr.Recurring != nil &&
+					pr.Recurring.Interval == period.interval &&
+					pr.Recurring.IntervalCount == period.count {
+					priceID = pr.ID
+					break
+				}
+			}
+
+			if priceID == "" {
+				pr, err := price.New(&stripe.PriceParams{
+					Product:    stripe.String(productID),
+					Currency:   stripe.String(string(stripe.CurrencyUSD)),
+					UnitAmount: stripe.Int64(cents),
+					Recurring: &stripe.PriceRecurringParams{
+						Interval:      stripe.String(string(period.interval)),
+						IntervalCount: stripe.Int64(period.count),
+					},
+					Metadata: map[string]string{
+						"pulse_plan":   p.code,
+						"pulse_period": period.name,
+					},
+				})
+				if err != nil {
+					log.Error("create price", "plan", p.code, "period", period.name, "err", err)
+					os.Exit(1)
+				}
+				priceID = pr.ID
+				log.Info("created price", "plan", p.code, "period", period.name, "cents", cents)
+			}
+
+			if _, err := pool.Exec(ctx,
+				"UPDATE plans SET "+period.column+"=$2 WHERE code=$1", p.code, priceID); err != nil {
+				log.Error("save price id", "plan", p.code, "err", err)
 				os.Exit(1)
 			}
-			priceID = pr.ID
-			log.Info("created price", "plan", p.code, "id", priceID, "cents", p.cents)
 		}
-
-		if _, err := pool.Exec(ctx,
-			`UPDATE plans SET stripe_price_id=$2 WHERE code=$1`, p.code, priceID); err != nil {
-			log.Error("save price id", "plan", p.code, "err", err)
-			os.Exit(1)
-		}
-		log.Info("plan ready", "plan", p.code, "price", priceID)
+		log.Info("plan ready", "plan", p.code)
 	}
 
 	log.Info("stripe setup complete")

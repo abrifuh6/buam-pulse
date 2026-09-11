@@ -36,6 +36,15 @@ export default function Billing({ account }: { account: Account | null }) {
   const [all, setAll] = useState<Plan[]>([])
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState('')
+  // Defaults to whatever the tenant is already billed on, so the screen opens
+  // showing their actual price rather than a monthly figure they don't pay.
+  const [period, setPeriod] = useState<Period>(
+    (account?.plan.billing_period as Period) ?? 'monthly',
+  )
+  // Which card the user is looking at. Starts on their own plan; clicking
+  // another previews it. Distinct from what they are actually on, which never
+  // changes without going through Stripe.
+  const [focused, setFocused] = useState<string | null>(null)
 
   const load = useCallback(() => {
     Promise.all([api.currentPlan(), api.listPlans()])
@@ -58,7 +67,7 @@ export default function Billing({ account }: { account: Account | null }) {
     try {
       const { url } = account?.plan.has_billing
         ? await api.billingPortal()
-        : await api.checkout(planCode)
+        : await api.checkout(planCode, period)
       window.location.href = url
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Could not open billing.')
@@ -102,6 +111,20 @@ export default function Billing({ account }: { account: Account | null }) {
         </div>
       )}
 
+      {account?.plan.trial_ends_at &&
+        account.plan.subscription_status === 'trialing' && (
+          <div className="panel" style={{ borderColor: 'var(--accent)' }}>
+            <p className="panel-note" style={{ margin: 0 }}>
+              Your {current.plan.name} trial runs until{' '}
+              {new Date(account.plan.trial_ends_at).toLocaleDateString(undefined, {
+                month: 'long',
+                day: 'numeric',
+              })}
+              . Your card is charged then unless you cancel before.
+            </p>
+          </div>
+        )}
+
       {ending && !pastDue && (
         <div className="panel">
           <p className="panel-note" style={{ margin: 0 }}>
@@ -134,38 +157,101 @@ export default function Billing({ account }: { account: Account | null }) {
 
       {err && <p className="err">{err}</p>}
 
-      <p className="section-label">Plans</p>
+      <div className="spread" style={{ margin: 'var(--s-6) 0 var(--s-4)' }}>
+        <p className="section-label" style={{ margin: 0 }}>
+          Plans
+        </p>
+        <div className="period-toggle">
+          {PERIODS.map((pr) => (
+            <button
+              key={pr.id}
+              className={period === pr.id ? 'on' : ''}
+              onClick={() => setPeriod(pr.id)}
+            >
+              {pr.label}
+              {pr.save && <span className="save">{pr.save}</span>}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className="plan-grid">
         {all.map((p) => {
           const isCurrent = p.code === current.plan.code
-          const isUpgrade = p.price_cents > current.plan.price_cents
-          // The middle tier carries the recommendation. Real pricing pages do
-          // this because an unanchored set of options makes people choose
-          // nothing; a marked default gives the decision a starting point.
-          const recommended = p.code === 'starter' && !isCurrent
+          const total = priceFor(p, period)
+          const months = PERIODS.find((x) => x.id === period)!.months
+          const perMonth = total / months / 100
+          const isFree = total === 0
+          const isUpgrade = total > priceFor(current.plan, period)
+
+          const isFocused = focused === p.code
 
           return (
             <div
               key={p.code}
+              role="radio"
+              aria-checked={isFocused || (focused === null && isCurrent)}
+              tabIndex={0}
               className={`plan ${isCurrent ? 'is-current' : ''} ${
-                recommended ? 'is-recommended' : ''
+                isFocused && !isCurrent ? 'is-focused' : ''
               }`}
+              onClick={() => setFocused(p.code)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  setFocused(p.code)
+                }
+              }}
             >
-              {recommended && <span className="plan-flag">Most teams start here</span>}
-              {isCurrent && <span className="plan-flag current">Your plan</span>}
+              {/* Only one highlight on this screen. The tenant's own plan is
+                  the thing that matters here, so a generic recommendation is
+                  not shown alongside it — two competing markers means neither
+                  reads as authoritative. */}
+              {isCurrent ? (
+                <span className="plan-flag current">Your plan</span>
+              ) : isFocused ? (
+                <span className="plan-flag">
+                  {isUpgrade ? 'Upgrading to this' : 'Switching to this'}
+                </span>
+              ) : null}
 
               <h3 className="plan-name">{p.name}</h3>
-              <div className="plan-price">
-                {p.price_cents === 0 ? (
-                  <b>Free</b>
-                ) : (
-                  <>
-                    <b>${(p.price_cents / 100).toFixed(0)}</b>
-                    <span>per month</span>
-                  </>
+
+              <div>
+                <div className="plan-price">
+                  {isFree ? (
+                    <b>Free</b>
+                  ) : (
+                    <>
+                      <b>${perMonth % 1 === 0 ? perMonth : perMonth.toFixed(2)}</b>
+                      <span>per month</span>
+                    </>
+                  )}
+                </div>
+                {!isFree && period !== 'monthly' && (
+                  <div className="metric" style={{ marginTop: 'var(--s-1)' }}>
+                    ${(total / 100).toFixed(0)} billed{' '}
+                    {period === 'yearly' ? 'yearly' : 'every 3 months'}
+                  </div>
                 )}
               </div>
+
+              {isFocused && !isCurrent && (
+                <div className="plan-delta">
+                  {current.usage.monitors > p.max_monitors ? (
+                    <span style={{ color: 'var(--warn)' }}>
+                      You have {current.usage.monitors} monitors. On {p.name} you keep them all,
+                      but cannot add more until you are under {p.max_monitors}.
+                    </span>
+                  ) : current.usage.members > p.max_members ? (
+                    <span style={{ color: 'var(--warn)' }}>
+                      You have {current.usage.members} team members, more than {p.name} allows.
+                    </span>
+                  ) : (
+                    <span>Everything you have today fits on this plan.</span>
+                  )}
+                </div>
+              )}
 
               <ul className="plan-features">
                 <li>
@@ -193,11 +279,20 @@ export default function Billing({ account }: { account: Account | null }) {
                 </button>
               ) : isOwner ? (
                 <button
-                  className={isUpgrade ? '' : 'ghost'}
-                  onClick={() => choose(p.code)}
+                  className={isFocused ? '' : 'ghost'}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    choose(p.code)
+                  }}
                   disabled={busy !== ''}
                 >
-                  {busy === p.code ? 'Opening…' : isUpgrade ? `Upgrade to ${p.name}` : `Switch to ${p.name}`}
+                  {busy === p.code
+                    ? 'Opening…'
+                    : account?.plan.has_billing
+                      ? `Switch to ${p.name}`
+                      : isFree
+                        ? 'Switch to Free'
+                        : `Try ${p.name} free for 14 days`}
                 </button>
               ) : (
                 <button className="ghost" disabled>
@@ -216,4 +311,20 @@ export default function Billing({ account }: { account: Account | null }) {
       )}
     </>
   )
+}
+
+type Period = 'monthly' | 'quarterly' | 'yearly'
+
+const PERIODS: { id: Period; label: string; months: number; save?: string }[] = [
+  { id: 'monthly', label: 'Monthly', months: 1 },
+  { id: 'quarterly', label: 'Quarterly', months: 3, save: '10% off' },
+  { id: 'yearly', label: 'Yearly', months: 12, save: '20% off' },
+]
+
+// Falls back to the monthly price when a plan has no price for the chosen
+// period, which is the case for Free — it has exactly one price and it is zero.
+function priceFor(p: Plan, period: Period): number {
+  if (period === 'quarterly') return p.price_cents_quarterly ?? p.price_cents * 3
+  if (period === 'yearly') return p.price_cents_yearly ?? p.price_cents * 12
+  return p.price_cents
 }

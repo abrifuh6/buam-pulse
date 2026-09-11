@@ -33,7 +33,8 @@ func (s *Server) CurrentPlan(w http.ResponseWriter, r *http.Request) {
 func (s *Server) ListPlans(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.DB.Query(r.Context(), `
 		SELECT code, name, max_monitors, min_interval, max_members,
-		       max_channels, retention_days, price_cents
+		       max_channels, retention_days, price_cents,
+		       price_cents_quarterly, price_cents_yearly
 		FROM plans ORDER BY sort_order`)
 	if err != nil {
 		writeErr(w, 500, "db")
@@ -45,7 +46,8 @@ func (s *Server) ListPlans(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var l plans.Limits
 		if rows.Scan(&l.Code, &l.Name, &l.MaxMonitors, &l.MinInterval,
-			&l.MaxMembers, &l.MaxChannels, &l.RetentionDays, &l.PriceCents) == nil {
+			&l.MaxMembers, &l.MaxChannels, &l.RetentionDays, &l.PriceCents,
+			&l.PriceQuarterly, &l.PriceYearly) == nil {
 			out = append(out, l)
 		}
 	}

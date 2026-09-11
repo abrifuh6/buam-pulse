@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"time"
 )
 
 // Account is the "who am I and where am I" summary the header needs. One
@@ -20,9 +21,11 @@ type Account struct {
 		Name string `json:"name"`
 		// Whether this tenant has ever checked out. Without a Stripe customer
 		// the portal cannot be opened, so the UI must offer Checkout instead.
-		HasBilling        bool    `json:"has_billing"`
-		Status            *string `json:"subscription_status"`
-		CancelAtPeriodEnd bool    `json:"cancel_at_period_end"`
+		HasBilling        bool       `json:"has_billing"`
+		Status            *string    `json:"subscription_status"`
+		CancelAtPeriodEnd bool       `json:"cancel_at_period_end"`
+		BillingPeriod     *string    `json:"billing_period"`
+		TrialEndsAt       *time.Time `json:"trial_ends_at"`
 	} `json:"plan"`
 	Counts struct {
 		Members  int `json:"members"`
@@ -37,7 +40,9 @@ func (s *Server) GetAccount(w http.ResponseWriter, r *http.Request) {
 	var a Account
 	err := s.DB.QueryRow(r.Context(), `
 		SELECT t.name, t.slug, u.email, u.role, p.code, p.name,
-		       t.stripe_customer_id IS NOT NULL, t.subscription_status, t.cancel_at_period_end, t.cancel_at_period_end,
+		       t.stripe_customer_id IS NOT NULL, t.subscription_status, t.cancel_at_period_end,
+		       t.billing_period, t.trial_ends_at,
+		       t.billing_period, t.trial_ends_at, t.cancel_at_period_end,
 		       (SELECT count(*) FROM users    WHERE tenant_id = t.id),
 		       (SELECT count(*) FROM monitors WHERE tenant_id = t.id)
 		FROM tenants t
@@ -45,7 +50,9 @@ func (s *Server) GetAccount(w http.ResponseWriter, r *http.Request) {
 		JOIN users u ON u.id = $2
 		WHERE t.id = $1`, c.TenantID, c.UserID).
 		Scan(&a.Tenant.Name, &a.Tenant.Slug, &a.User.Email, &a.User.Role,
-			&a.Plan.Code, &a.Plan.Name, &a.Plan.HasBilling, &a.Plan.Status, &a.Plan.CancelAtPeriodEnd, &a.Plan.CancelAtPeriodEnd,
+			&a.Plan.Code, &a.Plan.Name, &a.Plan.HasBilling, &a.Plan.Status, &a.Plan.CancelAtPeriodEnd,
+			&a.Plan.BillingPeriod, &a.Plan.TrialEndsAt,
+			&a.Plan.BillingPeriod, &a.Plan.TrialEndsAt, &a.Plan.CancelAtPeriodEnd,
 			&a.Counts.Members, &a.Counts.Monitors)
 	if err != nil {
 		writeErr(w, 500, "db")

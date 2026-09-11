@@ -69,6 +69,8 @@ export type Plan = {
   max_channels: number
   retention_days: number
   price_cents: number
+  price_cents_quarterly: number | null
+  price_cents_yearly: number | null
 }
 
 export type PlanUsage = {
@@ -86,6 +88,8 @@ export type Account = {
     has_billing: boolean
     subscription_status: string | null
     cancel_at_period_end: boolean
+    billing_period: string | null
+    trial_ends_at: string | null
   }
   counts: { members: number; monitors: number }
   status_url: string
@@ -337,10 +341,10 @@ export const api = {
       body: JSON.stringify({ confirm }),
     }),
 
-  checkout: (planCode: string) =>
+  checkout: (planCode: string, period: string = 'monthly') =>
     request<{ url: string }>('/billing/checkout', {
       method: 'POST',
-      body: JSON.stringify({ plan_code: planCode }),
+      body: JSON.stringify({ plan_code: planCode, period }),
     }),
 
   billingPortal: () =>

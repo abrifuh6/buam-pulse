@@ -14,14 +14,16 @@ import (
 )
 
 type Limits struct {
-	Code          string `json:"code"`
-	Name          string `json:"name"`
-	MaxMonitors   int    `json:"max_monitors"`
-	MinInterval   int    `json:"min_interval"`
-	MaxMembers    int    `json:"max_members"`
-	MaxChannels   int    `json:"max_channels"`
-	RetentionDays int    `json:"retention_days"`
-	PriceCents    int    `json:"price_cents"`
+	Code           string `json:"code"`
+	Name           string `json:"name"`
+	MaxMonitors    int    `json:"max_monitors"`
+	MinInterval    int    `json:"min_interval"`
+	MaxMembers     int    `json:"max_members"`
+	MaxChannels    int    `json:"max_channels"`
+	RetentionDays  int    `json:"retention_days"`
+	PriceCents     int    `json:"price_cents"`
+	PriceQuarterly *int   `json:"price_cents_quarterly"`
+	PriceYearly    *int   `json:"price_cents_yearly"`
 }
 
 type Usage struct {
@@ -40,11 +42,13 @@ func Get(ctx context.Context, q Querier, tenantID string) (Limits, error) {
 	var l Limits
 	err := q.QueryRow(ctx, `
 		SELECT p.code, p.name, p.max_monitors, p.min_interval,
-		       p.max_members, p.max_channels, p.retention_days, p.price_cents
+		       p.max_members, p.max_channels, p.retention_days, p.price_cents,
+		       p.price_cents_quarterly, p.price_cents_yearly
 		FROM tenants t JOIN plans p ON p.code = t.plan_code
 		WHERE t.id = $1`, tenantID).
 		Scan(&l.Code, &l.Name, &l.MaxMonitors, &l.MinInterval,
-			&l.MaxMembers, &l.MaxChannels, &l.RetentionDays, &l.PriceCents)
+			&l.MaxMembers, &l.MaxChannels, &l.RetentionDays, &l.PriceCents,
+			&l.PriceQuarterly, &l.PriceYearly)
 	return l, err
 }
 

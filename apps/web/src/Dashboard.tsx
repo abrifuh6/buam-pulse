@@ -52,6 +52,41 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
     api.listChannels().then(setChannels).catch(() => {})
   }, [])
 
+  // Someone who chose a plan on the marketing site arrives with that intent
+  // stored. This waits for the account to load before acting: firing on mount
+  // races the auth check, and a checkout call without a session fails silently.
+  //
+  // Only the owner can start a checkout, and a brand-new signup always is one,
+  // so this only ever runs for the person who made the choice.
+  useEffect(() => {
+    if (!account) return
+    const raw = sessionStorage.getItem('pulse.intent')
+    if (!raw) return
+    sessionStorage.removeItem('pulse.intent')
+
+    let plan = ''
+    let period = 'monthly'
+    try {
+      const parsed = JSON.parse(raw) as { plan?: string; period?: string }
+      plan = parsed.plan ?? ''
+      period = parsed.period ?? 'monthly'
+    } catch {
+      return
+    }
+    if (!plan || plan === 'free' || plan === account.plan.code) return
+
+    api
+      .checkout(plan, period)
+      .then(({ url }) => {
+        window.location.href = url
+      })
+      .catch(() => {
+        // Most likely they are not the owner. Land them on the plan screen
+        // rather than silently discarding the choice they made.
+        setTab('billing')
+      })
+  }, [account])
+
   // Monitors refresh on a timer because their state changes without the user
   // doing anything — that is the entire point of the product.
   useEffect(() => {

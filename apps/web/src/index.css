@@ -856,3 +856,41 @@ table.data th:first-child { padding-left: var(--s-5); }
 @keyframes rise {
   from { opacity: 0; transform: translateY(6px); }
 }
+
+/* Billing period toggle, matching the marketing site so the two read as one
+   product rather than two. */
+.period-toggle {
+  display: inline-flex; gap: 2px;
+  background: var(--ink-800); border: 1px solid var(--line);
+  border-radius: var(--r-full); padding: 3px;
+}
+.period-toggle button {
+  display: inline-flex; align-items: center; gap: var(--s-2);
+  background: transparent; border: 0; border-radius: var(--r-full);
+  padding: 5px var(--s-3);
+  color: var(--muted); font-size: var(--t-sm); cursor: pointer;
+}
+.period-toggle button:hover { background: transparent; color: var(--text); }
+.period-toggle button.on { background: var(--ink-700); color: var(--text); }
+.period-toggle .save {
+  font-size: var(--t-xs); color: var(--up);
+  background: var(--up-bg); padding: 1px 6px; border-radius: var(--r-full);
+}
+
+/* Plan cards respond to selection. The tenant's own plan keeps the green
+   border; a previewed plan gets the accent, so the two states never look the
+   same and "what I have" is never confused with "what I am considering". */
+.plan { cursor: pointer; }
+.plan:hover:not(.is-current):not(.is-focused) { border-color: var(--ink-600); }
+.plan.is-focused {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-bg);
+}
+.plan:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.plan button { position: relative; z-index: 1; }
+
+.plan-delta {
+  font-size: var(--t-sm); color: var(--muted);
+  background: var(--ink-900); border: 1px solid var(--line-soft);
+  border-radius: var(--r-sm); padding: var(--s-3);
+}
