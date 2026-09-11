@@ -86,34 +86,62 @@ func (s *Server) PublicStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	rows.Close()
 
-	// Daily uptime per monitor. generate_series produces every day in the
-	// window so gaps stay visible rather than silently collapsing the bar.
-	// NOTE: this is one query per monitor (N+1). Acceptable at current scale
-	// behind the 30s cache; the fix is a single GROUP BY monitor_id, day.
-	for _, rr := range summaries {
-		daily := make([]float64, 0, 90)
+	// Daily uptime for every monitor in ONE query, reading the rollup table
+	// rather than scanning raw results. This replaces the previous per-monitor
+	// query (an N+1) and keeps the cost flat as history grows: 90 days of one
+	// monitor is 90 rollup rows instead of a quarter of a million raw ones.
+	//
+	// Today is not in the rollup yet — it is still accumulating — so today's
+	// figure is computed live from raw results and appended.
+	daily := map[string][]float64{}
+	{
+		ids := make([]string, 0, len(summaries))
+		for _, rr := range summaries {
+			ids = append(ids, rr.id)
+			daily[rr.id] = make([]float64, 0, 90)
+		}
+
 		dRows, err := s.DB.Query(r.Context(), `
-			SELECT COALESCE(
-			         ROUND(100.0 * COUNT(*) FILTER (WHERE cr.ok) / NULLIF(COUNT(cr.id),0), 2),
-			         -1)::float8
-			FROM generate_series(
-			       (now() - interval '89 days')::date, now()::date, interval '1 day') AS d(day)
-			LEFT JOIN check_results cr
-			       ON cr.monitor_id = $1
-			      AND cr.checked_at >= d.day
-			      AND cr.checked_at <  d.day + interval '1 day'
-			GROUP BY d.day
-			ORDER BY d.day`, rr.id)
+			WITH days AS (
+				SELECT generate_series(
+					(CURRENT_DATE - 89), CURRENT_DATE, interval '1 day')::date AS day
+			),
+			mons AS (SELECT unnest($1::uuid[]) AS monitor_id)
+			SELECT m.monitor_id, d.day,
+			       CASE
+			         WHEN du.checks_total > 0
+			           THEN ROUND(100.0 * du.checks_ok / du.checks_total, 2)::float8
+			         WHEN today.total > 0
+			           THEN ROUND(100.0 * today.ok / today.total, 2)::float8
+			         ELSE -1
+			       END AS uptime
+			FROM mons m
+			CROSS JOIN days d
+			LEFT JOIN daily_uptime du
+			       ON du.monitor_id = m.monitor_id AND du.day = d.day
+			LEFT JOIN LATERAL (
+			       SELECT count(*) AS total, count(*) FILTER (WHERE ok) AS ok
+			       FROM check_results cr
+			       WHERE cr.monitor_id = m.monitor_id
+			         AND d.day = CURRENT_DATE
+			         AND cr.checked_at >= CURRENT_DATE
+			) today ON true
+			ORDER BY m.monitor_id, d.day`, ids)
 		if err == nil {
 			for dRows.Next() {
+				var id string
+				var day time.Time
 				var v float64
-				if dRows.Scan(&v) == nil {
-					daily = append(daily, v)
+				if dRows.Scan(&id, &day, &v) == nil {
+					daily[id] = append(daily[id], v)
 				}
 			}
 			dRows.Close()
 		}
-		rr.pm.Daily = daily
+	}
+
+	for _, rr := range summaries {
+		rr.pm.Daily = daily[rr.id]
 		out.Monitors = append(out.Monitors, rr.pm)
 	}
 

@@ -39,8 +39,8 @@ lint:
 
 IMAGE_PREFIX ?= pulse
 TAG ?= dev
-SERVICES = api scheduler worker migrate notifier
-ALL_IMAGES = api scheduler worker migrate notifier web status
+SERVICES = api scheduler worker migrate notifier retention
+ALL_IMAGES = api scheduler worker migrate notifier retention web status
 
 docker-build:  ## build all service images
 	@for s in $(SERVICES); do \
@@ -81,3 +81,6 @@ run-notifier:
 
 stripe-setup:  ## create Stripe products/prices and store their IDs
 	go run ./apps/stripe-setup/cmd/stripe-setup
+
+run-retention:
+	METRICS_PORT=9093 go run ./apps/retention/cmd/retention

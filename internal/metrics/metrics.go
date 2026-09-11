@@ -54,6 +54,17 @@ var (
 		Help: "Notifications waiting to be delivered.",
 	})
 
+	// Retention: how much data is being summarised and discarded.
+	RollupRows = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "pulse_rollup_days_total",
+		Help: "Monitor-days aggregated into daily_uptime.",
+	})
+
+	PrunedRows = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "pulse_pruned_results_total",
+		Help: "Raw check results deleted past their retention window.",
+	})
+
 	// Incidents opened, for correlating alert volume with real failures.
 	IncidentsOpened = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "pulse_incidents_opened_total",
