@@ -171,3 +171,10 @@
 - IBM Plex Sans throughout, Plex Mono only in numeric cells where digit alignment is functional
 - Real labels on every input, skeleton loading states, and empty states that say what to do next
 - Monitor settings moved to a side sheet: eleven settings would not fit an inline row, which is why keyword and routing were previously buried
+
+## 2026-09-11 — Dashboard completion
+- Monitor detail view: latency chart with p50/p95 band, bucketed server-side (30 days at 30s intervals is 86,400 points, which no chart should be handed), uptime for three windows, TLS expiry, and incident history
+- Chart is clickable: hover to scan, click to pin a bucket and read the numbers
+- Incidents screen across all monitors, ongoing sorted first; "nobody told" badge surfaces outages that fired with no alert channel configured
+- Monitor search, with / to focus and n to add — ignored while typing so they never swallow a character
+- Account screen: change password (current password required, so an unattended session cannot lock out the owner), export data, delete account
