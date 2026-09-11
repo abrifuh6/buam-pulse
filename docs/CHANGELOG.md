@@ -161,3 +161,13 @@
 - Support URL validated as http(s) — a javascript: URL there would be stored XSS against the customer's own visitors
 - "Powered by Pulse" removal gated on a paid plan, enforced server-side rather than by hiding the toggle
 - Planned incidents no longer appear as unexplained outages in the public incident list
+
+## 2026-09-11 — Dashboard redesign
+- Sidebar layout replaces the horizontal tab bar, which was already cramped at six sections; account control and theme switch pinned to the bottom
+- Status strip answers "is anything wrong" before anything else is read, and changes character when the answer is yes
+- Monitors are a dense table with inline latency sparklines rather than cards: a real customer has forty, and cards showed six
+- Design tokens: cool blue-shifted neutrals so status colour is the only saturated colour in the interface, and an accent outside the status family so a button can never read as a state
+- Day / Night / Auto, with separately tuned status colours per theme — the green that works on a dark panel fails contrast on white
+- IBM Plex Sans throughout, Plex Mono only in numeric cells where digit alignment is functional
+- Real labels on every input, skeleton loading states, and empty states that say what to do next
+- Monitor settings moved to a side sheet: eleven settings would not fit an inline row, which is why keyword and routing were previously buried
