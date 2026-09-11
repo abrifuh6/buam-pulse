@@ -63,28 +63,71 @@ func ProcessResult(ctx context.Context, pool *pgxpool.Pool, monitorID string, ok
 
 	switch {
 	case newStatus == "down" && status != "down":
+		// A window covering this monitor makes the incident planned: it is
+		// still recorded (so the history is complete) but no one is paged and
+		// it is excluded from headline uptime.
+		planned, err := inMaintenance(ctx, tx, monitorID)
+		if err != nil {
+			return err
+		}
+
 		var incidentID string
 		if err = tx.QueryRow(ctx, `
-			INSERT INTO incidents (tenant_id, monitor_id, cause)
-			VALUES ($1,$2,$3) RETURNING id`, tenantID, monitorID, cause).Scan(&incidentID); err != nil {
+			INSERT INTO incidents (tenant_id, monitor_id, cause, planned)
+			VALUES ($1,$2,$3,$4) RETURNING id`,
+			tenantID, monitorID, cause, planned).Scan(&incidentID); err != nil {
 			return err
 		}
-		if err = queueNotifications(ctx, tx, tenantID, monitorID, incidentID, "down"); err != nil {
+
+		if planned {
+			slog.Info("incident opened during maintenance — not alerting",
+				"monitor", name, "incident", incidentID)
+			break
+		}
+
+		// With no delay configured, queue immediately. With a delay, leave
+		// notified_at null and let the sweeper pick it up once the monitor has
+		// been down long enough — a brief outage then resolves before anyone
+		// is woken.
+		var delay int
+		if err = tx.QueryRow(ctx,
+			`SELECT alert_delay_seconds FROM monitors WHERE id=$1`, monitorID).Scan(&delay); err != nil {
 			return err
 		}
-		slog.Info("incident opened", "monitor", name, "incident", incidentID)
+		if delay == 0 {
+			if err = queueNotifications(ctx, tx, tenantID, monitorID, incidentID, "down"); err != nil {
+				return err
+			}
+			if _, err = tx.Exec(ctx,
+				`UPDATE incidents SET notified_at=now() WHERE id=$1`, incidentID); err != nil {
+				return err
+			}
+		}
+		slog.Info("incident opened", "monitor", name, "incident", incidentID,
+			"delay_seconds", delay)
 
 	case newStatus == "up" && status == "down":
 		var incidentID string
+		var planned bool
+		var notified *time.Time
 		err = tx.QueryRow(ctx, `
 			UPDATE incidents SET resolved_at=now()
 			WHERE monitor_id=$1 AND resolved_at IS NULL
-			RETURNING id`, monitorID).Scan(&incidentID)
+			RETURNING id, planned, notified_at`, monitorID).
+			Scan(&incidentID, &planned, &notified)
 		if err == pgx.ErrNoRows {
-			break // nothing open; nothing to announce
+			break
 		}
 		if err != nil {
 			return err
+		}
+
+		// Only announce recovery if we announced the failure. A recovery
+		// notice for an outage nobody heard about is confusing noise.
+		if planned || notified == nil {
+			slog.Info("incident resolved without alerting",
+				"monitor", name, "incident", incidentID, "planned", planned)
+			break
 		}
 		if err = queueNotifications(ctx, tx, tenantID, monitorID, incidentID, "recovered"); err != nil {
 			return err
@@ -205,4 +248,80 @@ func verifiedEmails(ctx context.Context, pool *pgxpool.Pool, tenantID string) ([
 		}
 	}
 	return out, nil
+}
+
+// inMaintenance reports whether the monitor is covered by an active window.
+// A window with no monitor rows covers the whole tenant.
+func inMaintenance(ctx context.Context, tx pgx.Tx, monitorID string) (bool, error) {
+	var covered bool
+	err := tx.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM maintenance_windows w
+			JOIN monitors m ON m.tenant_id = w.tenant_id
+			WHERE m.id = $1
+			  AND now() BETWEEN w.starts_at AND w.ends_at
+			  AND (
+			        NOT EXISTS (SELECT 1 FROM maintenance_monitors mm
+			                     WHERE mm.window_id = w.id)
+			     OR EXISTS (SELECT 1 FROM maintenance_monitors mm
+			                 WHERE mm.window_id = w.id AND mm.monitor_id = $1)
+			      )
+		)`, monitorID).Scan(&covered)
+	return covered, err
+}
+
+// SweepDelayedAlerts queues notifications for incidents that have now been open
+// longer than their monitor's alert delay.
+//
+// This runs on a timer rather than being scheduled at incident time because a
+// timer survives a restart: an in-process sleep would lose every pending alert
+// if the pod were rescheduled, which is exactly when you most want the alert.
+func SweepDelayedAlerts(ctx context.Context, pool *pgxpool.Pool) error {
+	rows, err := pool.Query(ctx, `
+		SELECT i.id, i.tenant_id, i.monitor_id, m.name
+		FROM incidents i
+		JOIN monitors m ON m.id = i.monitor_id
+		WHERE i.resolved_at IS NULL
+		  AND i.notified_at IS NULL
+		  AND NOT i.planned
+		  AND m.alert_delay_seconds > 0
+		  AND i.started_at < now() - (m.alert_delay_seconds || ' seconds')::interval`)
+	if err != nil {
+		return err
+	}
+
+	type due struct{ incidentID, tenantID, monitorID, name string }
+	var items []due
+	for rows.Next() {
+		var d due
+		if rows.Scan(&d.incidentID, &d.tenantID, &d.monitorID, &d.name) == nil {
+			items = append(items, d)
+		}
+	}
+	rows.Close()
+
+	for _, d := range items {
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			return err
+		}
+		if err := queueNotifications(ctx, tx, d.tenantID, d.monitorID, d.incidentID, "down"); err != nil {
+			_ = tx.Rollback(ctx)
+			slog.Error("queue delayed alert", "incident", d.incidentID, "err", err)
+			continue
+		}
+		if _, err := tx.Exec(ctx,
+			`UPDATE incidents SET notified_at=now() WHERE id=$1`, d.incidentID); err != nil {
+			_ = tx.Rollback(ctx)
+			slog.Error("mark delayed alert", "incident", d.incidentID, "err", err)
+			continue
+		}
+		if err := tx.Commit(ctx); err != nil {
+			slog.Error("commit delayed alert", "incident", d.incidentID, "err", err)
+			continue
+		}
+		slog.Info("delayed alert queued", "monitor", d.name, "incident", d.incidentID)
+	}
+	return nil
 }

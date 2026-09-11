@@ -3,6 +3,7 @@ import { api, currentRole, type Monitor, type CheckResult, type Account } from '
 import Channels from './Channels'
 import Team from './Team'
 import Billing from './Billing'
+import Maintenance from './Maintenance'
 import AccountHeader from './AccountHeader'
 
 function Sparkline({ id, refreshKey }: { id: string; refreshKey: number }) {
@@ -108,12 +109,18 @@ function MonitorRow({
   const [name, setName] = useState(m.name)
   const [target, setTarget] = useState(m.target)
   const [interval, setInterval] = useState(m.interval_seconds)
+  const [delay, setDelay] = useState(m.alert_delay_seconds)
   const [err, setErr] = useState('')
 
   async function save() {
     setErr('')
     try {
-      await api.updateMonitor(m.id, { name, target, interval_seconds: interval })
+      await api.updateMonitor(m.id, {
+        name,
+        target,
+        interval_seconds: interval,
+        alert_delay_seconds: delay,
+      })
       setEditing(false)
       onChanged()
     } catch (e) {
@@ -145,6 +152,18 @@ function MonitorRow({
             <option value={300}>5m</option>
           </select>
           <button onClick={save}>Save</button>
+        </div>
+        <div className="row" style={{ marginTop: 12 }}>
+          <label className="metric">Alert after</label>
+          <select value={delay} onChange={(e) => setDelay(Number(e.target.value))}>
+            <option value={0}>immediately</option>
+            <option value={120}>2 minutes down</option>
+            <option value={300}>5 minutes down</option>
+            <option value={900}>15 minutes down</option>
+          </select>
+          <span className="metric">
+            a delay avoids paging anyone for a brief blip
+          </span>
         </div>
         <div style={{ marginTop: 10 }}>
           <button className="ghost" onClick={() => setEditing(false)}>
@@ -187,7 +206,7 @@ function MonitorRow({
 }
 
 export default function Dashboard({ onLogout }: { onLogout: () => void }) {
-  const [tab, setTab] = useState<'monitors' | 'channels' | 'team' | 'billing'>('monitors')
+  const [tab, setTab] = useState<'monitors' | 'channels' | 'maintenance' | 'team' | 'billing'>('monitors')
   const role = currentRole()
   const canWrite = role === 'owner' || role === 'admin'
   const [monitors, setMonitors] = useState<Monitor[]>([])
@@ -238,6 +257,13 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
           </button>
           <button
             className="ghost"
+            onClick={() => setTab('maintenance')}
+            style={{ color: tab === 'maintenance' ? 'var(--text)' : undefined }}
+          >
+            Maintenance
+          </button>
+          <button
+            className="ghost"
             onClick={() => setTab('team')}
             style={{ color: tab === 'team' ? 'var(--text)' : undefined }}
           >
@@ -261,7 +287,9 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
         </div>
       </header>
 
-      {tab === 'billing' ? (
+      {tab === 'maintenance' ? (
+        <Maintenance monitors={monitors} />
+      ) : tab === 'billing' ? (
         <Billing account={account} />
       ) : tab === 'team' ? (
         <Team />

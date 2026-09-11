@@ -82,6 +82,12 @@ func main() {
 
 	tick := time.NewTicker(5 * time.Second)
 	for range tick.C {
+		// Sweep first: an incident whose delay has elapsed should be queued
+		// before this pass drains the queue, so it goes out immediately rather
+		// than waiting another cycle.
+		if err := alerting.SweepDelayedAlerts(ctx, pool); err != nil {
+			log.Error("sweep delayed alerts", "err", err)
+		}
 		drain(ctx, pool, smtpCfg, cfg.StatusURL, log)
 	}
 }

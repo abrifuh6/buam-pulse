@@ -64,6 +64,7 @@ func (s *Server) Router() http.Handler {
 			r.Get("/monitors", s.ListMonitors)
 			r.Get("/monitors/{id}/results", s.MonitorResults)
 			r.Get("/channels", s.ListChannels)
+			r.Get("/maintenance", s.ListMaintenance)
 			r.Get("/team/members", s.ListMembers)
 			r.Get("/team/invitations", s.ListInvitations)
 			r.Get("/billing/plan", s.CurrentPlan)
@@ -80,6 +81,8 @@ func (s *Server) Router() http.Handler {
 				r.Delete("/channels/{id}", s.DeleteChannel)
 				r.Post("/channels/{id}/test", s.TestChannel)
 
+				r.Post("/maintenance", s.CreateMaintenance)
+				r.Delete("/maintenance/{id}", s.DeleteMaintenance)
 				r.Post("/team/invitations", s.InviteMember)
 				r.Delete("/team/invitations/{id}", s.RevokeInvitation)
 			})

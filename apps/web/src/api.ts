@@ -12,6 +12,13 @@ export type Monitor = {
   enabled: boolean
   status: 'up' | 'down' | 'unknown'
   created_at: string
+  keyword: string | null
+  keyword_present: boolean
+  check_ssl: boolean
+  ssl_warn_days: number
+  ssl_expires_at: string | null
+  ssl_issuer: string | null
+  alert_delay_seconds: number
 }
 
 export type CheckResult = {
@@ -80,6 +87,17 @@ export type Account = {
   }
   counts: { members: number; monitors: number }
   status_url: string
+}
+
+
+export type MaintenanceWindow = {
+  id: string
+  title: string
+  description: string | null
+  starts_at: string
+  ends_at: string
+  monitor_ids: string[]
+  active: boolean
 }
 
 const TOKEN_KEY = 'pulse.token'
@@ -168,6 +186,7 @@ export const api = {
       target: string
       interval_seconds: number
       enabled: boolean
+      alert_delay_seconds: number
     }>,
   ) => request<void>(`/monitors/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
 
@@ -235,6 +254,20 @@ export const api = {
 
   billingPortal: () =>
     request<{ url: string }>('/billing/portal', { method: 'POST', body: '{}' }),
+
+  listMaintenance: () => request<MaintenanceWindow[]>('/maintenance'),
+
+  createMaintenance: (w: {
+    title: string
+    description?: string
+    starts_at: string
+    ends_at: string
+    monitor_ids: string[]
+  }) => request<{ id: string }>('/maintenance', { method: 'POST', body: JSON.stringify(w) }),
+
+  deleteMaintenance: (id: string) =>
+    request<void>(`/maintenance/${id}`, { method: 'DELETE' }),
+
 
 
 

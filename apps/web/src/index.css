@@ -112,3 +112,6 @@ button.ghost:hover { color: var(--text); }
 .acct-menu button.danger { color: var(--down); }
 .acct-meta { color: var(--muted); font-size: 13px; }
 .acct-sep { height: 1px; background: var(--border); margin: 6px 0; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip.on { background: var(--accent); color: #fff; border-color: var(--accent); }
