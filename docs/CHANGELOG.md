@@ -154,3 +154,10 @@
 - Recovery is only announced if the failure was — a recovery notice for an outage nobody heard about is noise
 - Per-monitor alert_delay_seconds: a swept timer queues the notification once the incident has been open long enough. A timer rather than an in-process sleep, because a sleep loses every pending alert when the pod restarts — exactly when the alert matters most
 - Verified: same failure produced a planned, silent incident inside a window and an alerting one outside it
+
+## 2026-09-11 — Phase 3.7 complete
+- Per-monitor alert routing: PUT replaces the whole channel set (idempotent, no add/remove semantics needed); an empty set means all channels, because silence is the worst failure mode for a monitoring product
+- Status page customization: custom title, subtitle and support link; per-monitor public visibility and display name so internal checks can stay private
+- Support URL validated as http(s) — a javascript: URL there would be stored XSS against the customer's own visitors
+- "Powered by Pulse" removal gated on a paid plan, enforced server-side rather than by hiding the toggle
+- Planned incidents no longer appear as unexplained outages in the public incident list
