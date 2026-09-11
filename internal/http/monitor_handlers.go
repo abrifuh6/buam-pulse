@@ -24,6 +24,13 @@ type Monitor struct {
 	Enabled         bool      `json:"enabled"`
 	Status          string    `json:"status"`
 	CreatedAt       time.Time `json:"created_at"`
+
+	Keyword        *string    `json:"keyword"`
+	KeywordPresent bool       `json:"keyword_present"`
+	CheckSSL       bool       `json:"check_ssl"`
+	SSLWarnDays    int        `json:"ssl_warn_days"`
+	SSLExpiresAt   *time.Time `json:"ssl_expires_at"`
+	SSLIssuer      *string    `json:"ssl_issuer"`
 }
 
 // Every query below filters by tenant_id from the token. A user can never
@@ -32,7 +39,10 @@ type Monitor struct {
 func (s *Server) ListMonitors(w http.ResponseWriter, r *http.Request) {
 	c := claimsFrom(r)
 	rows, err := s.DB.Query(r.Context(), `
-		SELECT id, name, type, target, interval_seconds, timeout_seconds, expected_status, enabled, status, created_at
+		SELECT id, name, type, target, interval_seconds, timeout_seconds,
+		       expected_status, enabled, status, created_at,
+		       keyword, keyword_present, check_ssl, ssl_warn_days,
+		       ssl_expires_at, ssl_issuer
 		FROM monitors WHERE tenant_id=$1 ORDER BY created_at`, c.TenantID)
 	if err != nil {
 		writeErr(w, 500, "db")
@@ -43,7 +53,9 @@ func (s *Server) ListMonitors(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var m Monitor
 		if err := rows.Scan(&m.ID, &m.Name, &m.Type, &m.Target, &m.IntervalSeconds, &m.TimeoutSeconds,
-			&m.ExpectedStatus, &m.Enabled, &m.Status, &m.CreatedAt); err == nil {
+			&m.ExpectedStatus, &m.Enabled, &m.Status, &m.CreatedAt,
+			&m.Keyword, &m.KeywordPresent, &m.CheckSSL, &m.SSLWarnDays,
+			&m.SSLExpiresAt, &m.SSLIssuer); err == nil {
 			out = append(out, m)
 		}
 	}
@@ -57,6 +69,10 @@ type monitorReq struct {
 	IntervalSeconds int    `json:"interval_seconds"`
 	TimeoutSeconds  int    `json:"timeout_seconds"`
 	ExpectedStatus  int    `json:"expected_status"`
+	Keyword         string `json:"keyword"`
+	KeywordPresent  *bool  `json:"keyword_present"`
+	CheckSSL        *bool  `json:"check_ssl"`
+	SSLWarnDays     int    `json:"ssl_warn_days"`
 }
 
 func (s *Server) CreateMonitor(w http.ResponseWriter, r *http.Request) {
@@ -86,6 +102,19 @@ func (s *Server) CreateMonitor(w http.ResponseWriter, r *http.Request) {
 	if in.ExpectedStatus == 0 {
 		in.ExpectedStatus = 200
 	}
+	// Default to "must contain" and to checking TLS: the safe, expected
+	// behaviour when the caller says nothing.
+	keywordPresent := true
+	if in.KeywordPresent != nil {
+		keywordPresent = *in.KeywordPresent
+	}
+	checkSSL := true
+	if in.CheckSSL != nil {
+		checkSSL = *in.CheckSSL
+	}
+	if in.SSLWarnDays <= 0 {
+		in.SSLWarnDays = 14
+	}
 
 	// Limit check and insert share one transaction, with the tenant row locked,
 	// so two concurrent requests cannot both pass a check at the boundary.
@@ -112,9 +141,12 @@ func (s *Server) CreateMonitor(w http.ResponseWriter, r *http.Request) {
 
 	var id string
 	err = tx.QueryRow(r.Context(), `
-		INSERT INTO monitors (tenant_id, name, type, target, interval_seconds, timeout_seconds, expected_status)
-		VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
-		c.TenantID, in.Name, in.Type, in.Target, in.IntervalSeconds, in.TimeoutSeconds, in.ExpectedStatus).Scan(&id)
+		INSERT INTO monitors (tenant_id, name, type, target, interval_seconds,
+		                      timeout_seconds, expected_status,
+		                      keyword, keyword_present, check_ssl, ssl_warn_days)
+		VALUES ($1,$2,$3,$4,$5,$6,$7, NULLIF($8,''), $9, $10, $11) RETURNING id`,
+		c.TenantID, in.Name, in.Type, in.Target, in.IntervalSeconds, in.TimeoutSeconds,
+		in.ExpectedStatus, in.Keyword, keywordPresent, checkSSL, in.SSLWarnDays).Scan(&id)
 	if err != nil {
 		slog.Error("create monitor", "err", err)
 		writeErr(w, 400, "could not create monitor (interval must be 30–3600s)")
@@ -134,6 +166,10 @@ type monitorUpdateReq struct {
 	TimeoutSeconds  *int    `json:"timeout_seconds"`
 	ExpectedStatus  *int    `json:"expected_status"`
 	Enabled         *bool   `json:"enabled"`
+	Keyword         *string `json:"keyword"`
+	KeywordPresent  *bool   `json:"keyword_present"`
+	CheckSSL        *bool   `json:"check_ssl"`
+	SSLWarnDays     *int    `json:"ssl_warn_days"`
 }
 
 // UpdateMonitor is a partial update: pointer fields distinguish "not supplied"
@@ -187,11 +223,16 @@ func (s *Server) UpdateMonitor(w http.ResponseWriter, r *http.Request) {
 		  timeout_seconds  = COALESCE($6, timeout_seconds),
 		  expected_status  = COALESCE($7, expected_status),
 		  enabled          = COALESCE($8, enabled),
+		  keyword          = COALESCE(NULLIF($9,''), keyword),
+		  keyword_present  = COALESCE($10, keyword_present),
+		  check_ssl        = COALESCE($11, check_ssl),
+		  ssl_warn_days    = COALESCE($12, ssl_warn_days),
 		  next_run_at      = CASE WHEN $8 IS TRUE AND NOT enabled THEN now() ELSE next_run_at END,
 		  updated_at       = now()
 		WHERE id=$1 AND tenant_id=$2`,
 		id, c.TenantID, in.Name, in.Target, in.IntervalSeconds,
-		in.TimeoutSeconds, in.ExpectedStatus, in.Enabled)
+		in.TimeoutSeconds, in.ExpectedStatus, in.Enabled,
+		in.Keyword, in.KeywordPresent, in.CheckSSL, in.SSLWarnDays)
 	if err != nil {
 		slog.Error("update monitor", "err", err)
 		writeErr(w, 400, "could not update monitor (interval must be 30–3600s)")

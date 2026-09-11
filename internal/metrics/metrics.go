@@ -54,6 +54,13 @@ var (
 		Help: "Notifications waiting to be delivered.",
 	})
 
+	// Days until each monitored certificate expires. A gauge rather than a
+	// counter: Prometheus can alert on it crossing a threshold.
+	CertDaysRemaining = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "pulse_cert_days_remaining",
+		Help: "Days until the monitored TLS certificate expires.",
+	}, []string{"monitor_id"})
+
 	// Retention: how much data is being summarised and discarded.
 	RollupRows = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "pulse_rollup_days_total",

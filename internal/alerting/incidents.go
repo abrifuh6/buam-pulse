@@ -5,7 +5,9 @@ package alerting
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -116,4 +118,91 @@ func queueNotifications(ctx context.Context, tx pgx.Tx, tenantID, monitorID, inc
 		ON CONFLICT (incident_id, channel_id, kind) DO NOTHING`,
 		tenantID, incidentID, monitorID, kind)
 	return err
+}
+
+// CheckCertExpiry queues a warning for certificates approaching expiry.
+//
+// Deliberately NOT an incident: the site is up, so opening an incident would
+// corrupt uptime figures and put a false outage on the status page. This is a
+// warning about a future problem, which is a different thing from a current one.
+//
+// ssl_alerted_for records which certificate we warned about, so renewing the
+// cert re-arms the warning while the same cert never warns twice.
+func CheckCertExpiry(ctx context.Context, pool *pgxpool.Pool, smtpSend func(to, subject, body string) error) error {
+	rows, err := pool.Query(ctx, `
+		SELECT m.id, m.name, m.target, m.ssl_expires_at, m.ssl_warn_days, t.id
+		FROM monitors m
+		JOIN tenants t ON t.id = m.tenant_id
+		WHERE m.enabled
+		  AND m.check_ssl
+		  AND m.ssl_expires_at IS NOT NULL
+		  AND m.ssl_expires_at < now() + (m.ssl_warn_days || ' days')::interval
+		  AND (m.ssl_alerted_for IS NULL OR m.ssl_alerted_for <> m.ssl_expires_at)`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	type warning struct {
+		monitorID, name, target, tenantID string
+		expires                           time.Time
+		warnDays                          int
+	}
+	var warns []warning
+	for rows.Next() {
+		var w warning
+		if rows.Scan(&w.monitorID, &w.name, &w.target, &w.expires, &w.warnDays, &w.tenantID) == nil {
+			warns = append(warns, w)
+		}
+	}
+
+	for _, w := range warns {
+		days := int(time.Until(w.expires).Hours() / 24)
+		subject := fmt.Sprintf("[Pulse] TLS certificate for %s expires in %d days", w.name, days)
+		body := fmt.Sprintf(
+			"The TLS certificate for %s expires on %s (%d days from now).\n\n"+
+				"Target: %s\n\nRenew it before then to avoid an outage.\n",
+			w.name, w.expires.UTC().Format("2 Jan 2006"), days, w.target)
+
+		addrs, err := verifiedEmails(ctx, pool, w.tenantID)
+		if err != nil {
+			slog.Error("cert warning recipients", "monitor", w.monitorID, "err", err)
+			continue
+		}
+		sent := false
+		for _, addr := range addrs {
+			if err := smtpSend(addr, subject, body); err != nil {
+				slog.Error("send cert warning", "to", addr, "err", err)
+				continue
+			}
+			sent = true
+		}
+		if sent {
+			if _, err := pool.Exec(ctx,
+				`UPDATE monitors SET ssl_alerted_for=$2 WHERE id=$1`, w.monitorID, w.expires); err != nil {
+				slog.Error("mark cert alerted", "monitor", w.monitorID, "err", err)
+			}
+			slog.Info("cert expiry warning sent", "monitor", w.name, "days", days)
+		}
+	}
+	return nil
+}
+
+func verifiedEmails(ctx context.Context, pool *pgxpool.Pool, tenantID string) ([]string, error) {
+	rows, err := pool.Query(ctx, `
+		SELECT config->>'address' FROM alert_channels
+		WHERE tenant_id=$1 AND type='email' AND enabled AND verified_at IS NOT NULL`, tenantID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []string
+	for rows.Next() {
+		var addr string
+		if rows.Scan(&addr) == nil && addr != "" {
+			out = append(out, addr)
+		}
+	}
+	return out, nil
 }

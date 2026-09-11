@@ -61,6 +61,25 @@ func main() {
 		User: cfg.SMTPUser, Password: cfg.SMTPPassword, From: cfg.AlertFrom,
 	}
 
+	send := func(to, subject, body string) error {
+		return alerting.SendEmail(smtpCfg, to, subject, body)
+	}
+
+	// Certificate expiry is checked far less often than the delivery queue is
+	// drained: expiry dates move on the scale of days, and re-scanning every
+	// five seconds would be pure waste.
+	certTick := time.NewTicker(6 * time.Hour)
+	go func() {
+		if err := alerting.CheckCertExpiry(ctx, pool, send); err != nil {
+			log.Error("cert expiry scan", "err", err)
+		}
+		for range certTick.C {
+			if err := alerting.CheckCertExpiry(ctx, pool, send); err != nil {
+				log.Error("cert expiry scan", "err", err)
+			}
+		}
+	}()
+
 	tick := time.NewTicker(5 * time.Second)
 	for range tick.C {
 		drain(ctx, pool, smtpCfg, cfg.StatusURL, log)
