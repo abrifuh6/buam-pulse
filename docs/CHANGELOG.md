@@ -178,3 +178,11 @@
 - Incidents screen across all monitors, ongoing sorted first; "nobody told" badge surfaces outages that fired with no alert channel configured
 - Monitor search, with / to focus and n to add — ignored while typing so they never swallow a character
 - Account screen: change password (current password required, so an unattended session cannot lock out the owner), export data, delete account
+
+## 2026-09-11 — Billing periods, trials, and the signup funnel
+- Three billing periods per plan (monthly, quarterly at 10% off, yearly at 20% off); prices stored per period rather than computed, so a rounded price is a data change not a code change
+- Stripe models quarterly as a monthly interval with a count of 3, not its own interval type
+- 14-day trial on paid plans with a card collected up front; trialing tenants get full plan access and the UI says when the charge lands
+- Webhook maps any of a plan's three price IDs back to the plan, so changing period in the portal keeps the plan instead of appearing to have none
+- Marketing site plan choice carries through signup into Stripe Checkout: without it a visitor who picked Pro landed on an empty dashboard and had to choose again, which is where signups get abandoned
+- Plan cards are selectable in both apps; in the dashboard, selecting one previews whether current usage fits before switching
