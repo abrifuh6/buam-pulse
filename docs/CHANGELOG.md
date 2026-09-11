@@ -133,3 +133,10 @@
 - DELETE /account requires typing the organization name, cancels the Stripe subscription before deleting, and relies on ON DELETE CASCADE for atomic removal
 - deletion_log records the request before anything is destroyed and the counts after, so there is evidence the data no longer exists
 - Verified: 3 monitors and 966 results removed, no orphaned rows, other tenants untouched
+
+## 2026-09-11 — Phase 3.6 step 5: retention and rollups
+- daily_uptime table: one row per monitor per day with checks, successes, p50/p95/p99/max latency and downtime minutes from incident spans
+- retention service rolls up completed days (idempotent, resumable via retention_state) and prunes raw results past each plan's window in 10k batches so no single transaction holds long locks
+- Status page now reads the rollup in ONE query for all monitors, removing the earlier N+1; today is still computed live since it is incomplete
+- Scale rationale: 149 raw rows occupy 328 kB (~2.2 kB/row with overhead and index); at 30s intervals a hundred monitors reach ~26M rows and ~57 GB over 90 days. The rollup replaces each monitor-day with one ~100-byte row.
+- RUN_ONCE=true makes the service usable as a Kubernetes CronJob
