@@ -33,8 +33,17 @@
   --r-lg: 12px;
   --r-full: 999px;
 
-  --sans: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
+  /* Inter for the interface: it was drawn for screens at small sizes and has
+     proper optical sizing, which is why it holds up in a dense table. Inter
+     Tight for display, where the tighter fit gives large type the confident,
+     packed look that reads as considered rather than default.
+
+     JetBrains Mono only in numeric cells — it has the clearest distinction
+     between 0/O and 1/l/I of the free monospaces, which matters when the
+     numbers are latencies you are comparing at a glance. */
+  --sans:    'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --display: 'Inter Tight', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --mono:    'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
 
   --sidebar-w: 216px;
 
@@ -134,6 +143,17 @@ body {
   font-size: var(--t-md);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Contextual alternates and slashed zero: Inter's tabular figures and its
+     disambiguated zero are opt-in features, and both matter here. */
+  font-feature-settings: 'cv05' 1, 'ss03' 1;
+}
+
+/* Tracking tightens as type grows. This is the single strongest lever on
+   whether large type looks designed or defaulted — display sizes set at normal
+   tracking always read as loose. */
+.page-title, .auth-brand, .plan-price b, .stat b, .strip-headline {
+  font-family: var(--display);
 }
 
 /* Numbers align. Every figure in the interface is tabular so columns of
@@ -183,8 +203,9 @@ a:hover { color: var(--accent-hover); }
   padding: var(--s-2) var(--s-3);
   margin-bottom: var(--s-5);
   font-size: var(--t-lg);
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-family: var(--display);
   background: transparent;
   border: 0;
   border-radius: var(--r-sm);
@@ -235,7 +256,7 @@ a:hover { color: var(--accent-hover); }
   gap: var(--s-4);
   margin-bottom: var(--s-5);
 }
-.page-title { font-size: var(--t-xl); font-weight: 600; letter-spacing: -0.02em; margin: 0; }
+.page-title { font-size: var(--t-xl); font-weight: 600; letter-spacing: -0.025em; margin: 0; }
 .page-sub { color: var(--muted); font-size: var(--t-sm); margin: 0; }
 
 /* ============================================================================
@@ -257,7 +278,7 @@ a:hover { color: var(--accent-hover); }
   border-color: var(--down);
   background: linear-gradient(90deg, var(--down-bg), transparent 60%), var(--ink-800);
 }
-.strip-headline { font-size: var(--t-lg); font-weight: 600; letter-spacing: -0.01em; }
+.strip-headline { font-size: var(--t-lg); font-weight: 600; letter-spacing: -0.02em; }
 .strip.is-down .strip-headline { color: var(--down); }
 .strip-detail { color: var(--muted); font-size: var(--t-sm); }
 .strip-stats { margin-left: auto; display: flex; gap: var(--s-6); }
@@ -541,7 +562,7 @@ button.danger:hover { background: #ff6a56; }
 .auth { display: grid; place-items: center; min-height: 100vh; padding: var(--s-5); }
 .auth-card { width: 100%; max-width: 360px; }
 .auth-brand {
-  font-size: var(--t-xl); font-weight: 600; letter-spacing: -0.02em;
+  font-size: var(--t-xl); font-weight: 700; letter-spacing: -0.03em;
   margin: 0 0 var(--s-1);
 }
 .auth-sub { color: var(--muted); font-size: var(--t-sm); margin: 0 0 var(--s-5); }
@@ -664,8 +685,8 @@ button.danger:hover { background: #ff6a56; }
   margin-bottom: var(--s-4); }
 .stat { background: var(--ink-800); border: 1px solid var(--line);
   border-radius: var(--r-md); padding: var(--s-4); }
-.stat b { display: block; font-family: var(--mono); font-size: var(--t-xl);
-  font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.stat b { display: block; font-size: var(--t-xl);
+  font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
 .stat span { color: var(--muted); font-size: var(--t-xs); }
 
 .window-picker { display: flex; background: var(--ink-800); border: 1px solid var(--line);
@@ -682,3 +703,156 @@ button.danger:hover { background: #ff6a56; }
 .detail-head { margin-bottom: var(--s-4); }
 
 .search { max-width: 280px; }
+
+/* ============================================================================
+   Polish
+   ========================================================================== */
+
+/* Motion answers an action; it is not decoration. These transitions only fire
+   on things the user just did — a hover, a focus, a panel opening. Nothing
+   animates on page load. */
+.nav-item, .chip, .acct-btn, button, input, select {
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.sheet-backdrop { animation: fade 140ms ease-out; }
+.sheet { animation: slide-in 180ms cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes fade { from { opacity: 0; } }
+@keyframes slide-in { from { transform: translateX(16px); opacity: 0; } }
+
+/* The status strip pulses once when it flips to a failure state, so a change
+   arriving while you are looking elsewhere still catches your eye. It runs
+   once rather than looping: a permanently animating alarm becomes wallpaper. */
+.strip.is-down { animation: alarm 900ms ease-out; }
+@keyframes alarm {
+  0%   { box-shadow: 0 0 0 0 var(--down-bg); }
+  60%  { box-shadow: 0 0 0 10px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* A monitor that is currently down gets a slow breathing dot, which reads as
+   "still happening" rather than "happened". Only for the down state — a green
+   dot that pulses would be noise. */
+.state.down { animation: breathe 2.4s ease-in-out infinite; }
+@keyframes breathe {
+  0%, 100% { box-shadow: 0 0 0 3px var(--down-bg); }
+  50%      { box-shadow: 0 0 0 6px transparent; }
+}
+
+/* Tables get a little more air on the name column and tighter numeric columns,
+   so the eye lands on names and can still scan figures. */
+table.data td.right, table.data th.right { padding-right: var(--s-5); }
+table.data td:first-child { padding-left: var(--s-5); }
+table.data th:first-child { padding-left: var(--s-5); }
+
+/* Links inside prose, distinct from buttons */
+.panel-note a { text-decoration: underline; text-underline-offset: 2px; }
+
+/* Toast — a save confirmation belongs near the action but out of the layout,
+   so a panel does not jump when a message appears and disappears. */
+.toast {
+  position: fixed; bottom: var(--s-5); left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink-700); border: 1px solid var(--line);
+  border-radius: var(--r-md); padding: var(--s-3) var(--s-4);
+  font-size: var(--t-sm); z-index: 60;
+  box-shadow: var(--shadow-menu);
+  animation: toast-in 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.toast.ok  { border-color: var(--up); }
+.toast.bad { border-color: var(--down); }
+@keyframes toast-in { from { transform: translate(-50%, 12px); opacity: 0; } }
+
+/* Light theme needs slightly stronger panel separation, since it cannot rely
+   on a lighter surface against a darker page the way the dark theme does. */
+[data-theme='light'] .panel,
+[data-theme='light'] .table-wrap,
+[data-theme='light'] .chart,
+[data-theme='light'] .stat {
+  box-shadow: 0 1px 2px rgba(22, 32, 42, 0.05);
+}
+[data-theme='light'] .sidebar { border-right-color: var(--line); }
+
+/* Numbers in the light theme need slightly more weight to hold against white */
+[data-theme='light'] .num { font-weight: 500; }
+
+/* Plan cards. A pricing table makes you read across rows to compare; cards let
+   you read one option at a time and decide. The recommended tier is lifted
+   rather than recoloured, so the emphasis does not compete with status colour. */
+.plan-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--s-4);
+  align-items: start;
+}
+
+.plan {
+  position: relative;
+  background: var(--ink-800);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: var(--s-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+.plan.is-recommended {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-bg), 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+[data-theme='light'] .plan.is-recommended {
+  box-shadow: 0 0 0 1px var(--accent-bg), 0 8px 20px rgba(22, 32, 42, 0.08);
+}
+.plan.is-current { border-color: var(--up); }
+
+.plan-flag {
+  position: absolute; top: -9px; left: var(--s-5);
+  background: var(--accent); color: var(--accent-ink);
+  font-size: var(--t-xs); font-weight: 500;
+  padding: 2px var(--s-2); border-radius: var(--r-full);
+}
+.plan-flag.current { background: var(--up); color: var(--ink-900); }
+[data-theme='light'] .plan-flag.current { color: #fff; }
+
+.plan-name { font-size: var(--t-md); font-weight: 600; margin: 0; }
+
+.plan-price { display: flex; align-items: baseline; gap: var(--s-2); }
+.plan-price b {
+  font-family: var(--mono); font-size: var(--t-2xl); font-weight: 500;
+  letter-spacing: -0.03em;
+}
+.plan-price span { color: var(--muted); font-size: var(--t-sm); }
+
+.plan-features { list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: var(--s-2); }
+.plan-features li { color: var(--muted); font-size: var(--t-sm); }
+.plan-features li b { color: var(--text); font-weight: 500; }
+
+.plan button { width: 100%; margin-top: auto; }
+
+/* View transitions. The browser crossfades the old and new view for us, which
+   is far smoother than animating React state — and it degrades to an instant
+   swap in browsers that do not support it, which is the correct fallback. */
+@view-transition { navigation: auto; }
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 180ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* The sidebar is named separately so it stays put while the content changes.
+   Crossfading the navigation along with the page is what makes an app feel
+   like a website reloading. */
+.sidebar { view-transition-name: sidebar; }
+::view-transition-group(sidebar) { animation: none; }
+
+.main-inner { view-transition-name: content; }
+
+/* Content that swaps inside a page — a monitor opening, a window changing —
+   gets a short rise so the eye follows the change rather than being startled
+   by it. */
+.fade-in { animation: rise 200ms cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+}

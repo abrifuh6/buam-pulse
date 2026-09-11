@@ -136,56 +136,77 @@ export default function Billing({ account }: { account: Account | null }) {
 
       <p className="section-label">Plans</p>
 
-      <div className="table-wrap">
-        <table className="data">
-          <thead>
-            <tr>
-              <th>Plan</th>
-              <th className="right">Monitors</th>
-              <th className="right">Fastest check</th>
-              <th className="right">Members</th>
-              <th className="right">History</th>
-              <th className="right">Price</th>
-              <th className="right" style={{ width: 120 }} />
-            </tr>
-          </thead>
-          <tbody>
-            {all.map((p) => {
-              const isCurrent = p.code === current.plan.code
-              const isUpgrade = p.price_cents > current.plan.price_cents
-              return (
-                <tr key={p.code}>
-                  <td>
-                    <div className="cell-name">
-                      {p.name}
-                      {isCurrent && (
-                        <span className="badge up" style={{ marginLeft: 8 }}>
-                          current
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="right num">{p.max_monitors}</td>
-                  <td className="right num">{interval(p.min_interval)}</td>
-                  <td className="right num">{p.max_members}</td>
-                  <td className="right num">{p.retention_days}d</td>
-                  <td className="right num">{money(p.price_cents)}</td>
-                  <td className="right">
-                    {!isCurrent && isOwner && (
-                      <button
-                        className={isUpgrade ? '' : 'ghost'}
-                        onClick={() => choose(p.code)}
-                        disabled={busy !== ''}
-                      >
-                        {busy === p.code ? '…' : isUpgrade ? 'Upgrade' : 'Downgrade'}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+      <div className="plan-grid">
+        {all.map((p) => {
+          const isCurrent = p.code === current.plan.code
+          const isUpgrade = p.price_cents > current.plan.price_cents
+          // The middle tier carries the recommendation. Real pricing pages do
+          // this because an unanchored set of options makes people choose
+          // nothing; a marked default gives the decision a starting point.
+          const recommended = p.code === 'starter' && !isCurrent
+
+          return (
+            <div
+              key={p.code}
+              className={`plan ${isCurrent ? 'is-current' : ''} ${
+                recommended ? 'is-recommended' : ''
+              }`}
+            >
+              {recommended && <span className="plan-flag">Most teams start here</span>}
+              {isCurrent && <span className="plan-flag current">Your plan</span>}
+
+              <h3 className="plan-name">{p.name}</h3>
+              <div className="plan-price">
+                {p.price_cents === 0 ? (
+                  <b>Free</b>
+                ) : (
+                  <>
+                    <b>${(p.price_cents / 100).toFixed(0)}</b>
+                    <span>per month</span>
+                  </>
+                )}
+              </div>
+
+              <ul className="plan-features">
+                <li>
+                  <b className="num">{p.max_monitors}</b> monitors
+                </li>
+                <li>
+                  checks every <b className="num">{interval(p.min_interval)}</b>
+                </li>
+                <li>
+                  <b className="num">{p.max_members}</b>{' '}
+                  {p.max_members === 1 ? 'team member' : 'team members'}
+                </li>
+                <li>
+                  <b className="num">{p.max_channels}</b> alert{' '}
+                  {p.max_channels === 1 ? 'channel' : 'channels'}
+                </li>
+                <li>
+                  <b className="num">{p.retention_days}</b> days of history
+                </li>
+              </ul>
+
+              {isCurrent ? (
+                <button className="ghost" disabled>
+                  Current plan
+                </button>
+              ) : isOwner ? (
+                <button
+                  className={isUpgrade ? '' : 'ghost'}
+                  onClick={() => choose(p.code)}
+                  disabled={busy !== ''}
+                >
+                  {busy === p.code ? 'Opening…' : isUpgrade ? `Upgrade to ${p.name}` : `Switch to ${p.name}`}
+                </button>
+              ) : (
+                <button className="ghost" disabled>
+                  Owner only
+                </button>
+              )}
+            </div>
+          )
+        })}
       </div>
 
       {!isOwner && (

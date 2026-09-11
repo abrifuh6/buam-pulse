@@ -4,6 +4,7 @@ import Sparkline from './Sparkline'
 import StatusStrip from './StatusStrip'
 import MonitorForm from './MonitorForm'
 import MonitorDetail from './MonitorDetail'
+import { withTransition } from './transition'
 
 function relative(iso: string | null): string {
   if (!iso) return '—'
@@ -95,7 +96,7 @@ export default function Monitors({
         monitor={current}
         channels={channels}
         canWrite={canWrite}
-        onClose={() => setViewing(null)}
+        onClose={() => withTransition(() => setViewing(null))}
         onChanged={onChanged}
       />
     )
@@ -180,7 +181,7 @@ export default function Monitors({
                 <tr
                   key={m.id}
                   className={`clickable ${m.enabled ? '' : 'is-paused'}`}
-                  onClick={() => setViewing(m.id)}
+                  onClick={() => withTransition(() => setViewing(m.id))}
                 >
                   <td>
                     <span

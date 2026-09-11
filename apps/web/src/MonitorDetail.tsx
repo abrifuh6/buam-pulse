@@ -59,7 +59,7 @@ export default function MonitorDetail({
     detail && (window === '24h' ? detail.uptime_24h : window === '7d' ? detail.uptime_7d : detail.uptime_30d)
 
   return (
-    <div className="detail">
+    <div className="detail fade-in">
       <div className="detail-head">
         <button className="quiet" onClick={onClose}>
           ← Monitors
@@ -119,7 +119,9 @@ export default function MonitorDetail({
       </div>
 
       {detail ? (
-        <LatencyChart series={detail.series} />
+        <div className="fade-in" key={window}>
+          <LatencyChart series={detail.series} />
+        </div>
       ) : (
         <div className="skeleton" style={{ height: 240 }} />
       )}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, currentRole, type Account, type Channel, type Monitor } from './api'
 import Shell, { type Tab } from './Shell'
+import { withTransition } from './transition'
 import Monitors from './Monitors'
 import Incidents from './Incidents'
 import Channels from './Channels'
@@ -64,7 +65,7 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
   return (
     <Shell
       tab={tab}
-      onTab={setTab}
+      onTab={(t) => withTransition(() => setTab(t))}
       account={account}
       onLogout={onLogout}
       downCount={downCount}
@@ -75,10 +76,12 @@ export default function Dashboard({ onLogout }: { onLogout: () => void }) {
 
       {tab === 'incidents' && (
         <Incidents
-          onOpenMonitor={(id) => {
-            setTab('monitors')
-            setOpenMonitor(id)
-          }}
+          onOpenMonitor={(id) =>
+            withTransition(() => {
+              setTab('monitors')
+              setOpenMonitor(id)
+            })
+          }
         />
       )}
       {tab === 'monitors' && (
