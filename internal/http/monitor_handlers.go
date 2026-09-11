@@ -299,3 +299,125 @@ func (s *Server) MonitorResults(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, 200, out)
 }
+
+type seriesPoint struct {
+	At         time.Time `json:"at"`
+	Uptime     float64   `json:"uptime"` // percent for the bucket
+	LatencyP50 *int      `json:"latency_p50"`
+	LatencyP95 *int      `json:"latency_p95"`
+	Checks     int       `json:"checks"`
+}
+
+type monitorDetail struct {
+	Uptime24h  float64          `json:"uptime_24h"`
+	Uptime7d   float64          `json:"uptime_7d"`
+	Uptime30d  float64          `json:"uptime_30d"`
+	AvgLatency *int             `json:"avg_latency_ms"`
+	P95Latency *int             `json:"p95_latency_ms"`
+	Series     []seriesPoint    `json:"series"`
+	Incidents  []detailIncident `json:"incidents"`
+}
+
+type detailIncident struct {
+	StartedAt  time.Time  `json:"started_at"`
+	ResolvedAt *time.Time `json:"resolved_at"`
+	Minutes    int        `json:"minutes"`
+	Planned    bool       `json:"planned"`
+	Notified   bool       `json:"notified"`
+	Cause      *string    `json:"cause"`
+}
+
+// MonitorDetail returns everything the detail view needs in one request.
+//
+// The series is bucketed rather than returned raw: 30 days at 30-second
+// intervals is 86,400 points, which no chart can draw and no browser should be
+// asked to parse. Bucket width scales with the window so the chart always has
+// roughly the same number of points.
+func (s *Server) MonitorDetail(w http.ResponseWriter, r *http.Request) {
+	c := claimsFrom(r)
+	id := chi.URLParam(r, "id")
+
+	var interval, bucket string
+	switch r.URL.Query().Get("window") {
+	case "7d":
+		interval, bucket = "7 days", "1 hour"
+	case "30d":
+		interval, bucket = "30 days", "6 hours"
+	default:
+		interval, bucket = "24 hours", "15 minutes"
+	}
+
+	var exists bool
+	if err := s.DB.QueryRow(r.Context(),
+		`SELECT EXISTS (SELECT 1 FROM monitors WHERE id=$1 AND tenant_id=$2)`,
+		id, c.TenantID).Scan(&exists); err != nil || !exists {
+		writeErr(w, 404, "not found")
+		return
+	}
+
+	out := monitorDetail{Series: []seriesPoint{}, Incidents: []detailIncident{}}
+
+	// Three uptime windows in one round trip rather than three.
+	if err := s.DB.QueryRow(r.Context(), `
+		SELECT
+		  COALESCE(ROUND(100.0 * count(*) FILTER (WHERE ok AND checked_at > now() - interval '24 hours')
+		           / NULLIF(count(*) FILTER (WHERE checked_at > now() - interval '24 hours'),0), 2), 0)::float8,
+		  COALESCE(ROUND(100.0 * count(*) FILTER (WHERE ok AND checked_at > now() - interval '7 days')
+		           / NULLIF(count(*) FILTER (WHERE checked_at > now() - interval '7 days'),0), 2), 0)::float8,
+		  COALESCE(ROUND(100.0 * count(*) FILTER (WHERE ok AND checked_at > now() - interval '30 days')
+		           / NULLIF(count(*) FILTER (WHERE checked_at > now() - interval '30 days'),0), 2), 0)::float8,
+		  AVG(latency_ms) FILTER (WHERE ok AND checked_at > now() - interval '24 hours')::int,
+		  percentile_disc(0.95) WITHIN GROUP (ORDER BY latency_ms)
+		    FILTER (WHERE ok AND checked_at > now() - interval '24 hours')
+		FROM check_results WHERE monitor_id=$1`, id).
+		Scan(&out.Uptime24h, &out.Uptime7d, &out.Uptime30d, &out.AvgLatency, &out.P95Latency); err != nil {
+		slog.Error("monitor detail summary", "err", err)
+		writeErr(w, 500, "db")
+		return
+	}
+
+	// date_bin gives fixed-width buckets aligned to the epoch, so the same
+	// timestamp always lands in the same bucket regardless of when the query
+	// runs — the chart does not shift under you on refresh.
+	rows, err := s.DB.Query(r.Context(), `
+		SELECT date_bin($2::interval, checked_at, TIMESTAMPTZ '2000-01-01') AS at,
+		       COALESCE(ROUND(100.0 * count(*) FILTER (WHERE ok) / count(*), 2), 0)::float8,
+		       percentile_disc(0.50) WITHIN GROUP (ORDER BY latency_ms) FILTER (WHERE ok),
+		       percentile_disc(0.95) WITHIN GROUP (ORDER BY latency_ms) FILTER (WHERE ok),
+		       count(*)::int
+		FROM check_results
+		WHERE monitor_id=$1 AND checked_at > now() - $3::interval
+		GROUP BY at ORDER BY at`, id, bucket, interval)
+	if err != nil {
+		slog.Error("monitor detail series", "err", err)
+		writeErr(w, 500, "db")
+		return
+	}
+	for rows.Next() {
+		var p seriesPoint
+		if rows.Scan(&p.At, &p.Uptime, &p.LatencyP50, &p.LatencyP95, &p.Checks) == nil {
+			out.Series = append(out.Series, p)
+		}
+	}
+	rows.Close()
+
+	iRows, err := s.DB.Query(r.Context(), `
+		SELECT started_at, resolved_at,
+		       EXTRACT(EPOCH FROM (COALESCE(resolved_at, now()) - started_at))/60,
+		       planned, notified_at IS NOT NULL, cause
+		FROM incidents WHERE monitor_id=$1
+		ORDER BY started_at DESC LIMIT 20`, id)
+	if err == nil {
+		for iRows.Next() {
+			var d detailIncident
+			var mins float64
+			if iRows.Scan(&d.StartedAt, &d.ResolvedAt, &mins, &d.Planned, &d.Notified, &d.Cause) == nil {
+				d.Minutes = int(mins)
+				out.Incidents = append(out.Incidents, d)
+			}
+		}
+		iRows.Close()
+	}
+
+	writeJSON(w, 200, out)
+}

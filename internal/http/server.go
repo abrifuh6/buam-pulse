@@ -64,6 +64,7 @@ func (s *Server) Router() http.Handler {
 			r.Get("/monitors", s.ListMonitors)
 			r.Get("/monitors/{id}/results", s.MonitorResults)
 			r.Get("/monitors/{id}/channels", s.GetMonitorChannels)
+			r.Get("/monitors/{id}/detail", s.MonitorDetail)
 			r.Get("/channels", s.ListChannels)
 			r.Get("/maintenance", s.ListMaintenance)
 			r.Get("/status-page", s.GetStatusPageSettings)

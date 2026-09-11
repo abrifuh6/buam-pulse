@@ -3,6 +3,7 @@ import { api, type Channel, type CheckResult, type Monitor } from './api'
 import Sparkline from './Sparkline'
 import StatusStrip from './StatusStrip'
 import MonitorForm from './MonitorForm'
+import MonitorDetail from './MonitorDetail'
 
 function relative(iso: string | null): string {
   if (!iso) return '—'
@@ -34,6 +35,7 @@ export default function Monitors({
 }) {
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<Monitor | null>(null)
+  const [viewing, setViewing] = useState<string | null>(null)
   const [data, setData] = useState<Record<string, RowData>>({})
 
   // One request per monitor for its recent history. Batched into a single
@@ -56,6 +58,19 @@ export default function Monitors({
       alive = false
     }
   }, [monitors])
+
+  const current = monitors.find((m) => m.id === viewing)
+  if (current) {
+    return (
+      <MonitorDetail
+        monitor={current}
+        channels={channels}
+        canWrite={canWrite}
+        onClose={() => setViewing(null)}
+        onChanged={onChanged}
+      />
+    )
+  }
 
   if (loading) {
     return (
@@ -122,7 +137,11 @@ export default function Monitors({
               const lastResult = d?.results[d.results.length - 1]
               const latency = lastResult?.latency_ms
               return (
-                <tr key={m.id} className={m.enabled ? '' : 'is-paused'}>
+                <tr
+                  key={m.id}
+                  className={`clickable ${m.enabled ? '' : 'is-paused'}`}
+                  onClick={() => setViewing(m.id)}
+                >
                   <td>
                     <span
                       className={`state ${m.enabled ? m.status : 'unknown'}`}
@@ -141,7 +160,13 @@ export default function Monitors({
                   <td className="right num">{relative(d?.last ?? null)}</td>
                   <td className="right">
                     {canWrite && (
-                      <button className="quiet" onClick={() => setEditing(m)}>
+                      <button
+                        className="quiet"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setEditing(m)
+                        }}
+                      >
                         Edit
                       </button>
                     )}

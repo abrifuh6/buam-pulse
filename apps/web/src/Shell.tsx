@@ -96,9 +96,9 @@ export default function Shell({
   return (
     <div className="shell">
       <nav className="sidebar">
-        <div className="brand">
+        <button className="brand" onClick={() => onTab('monitors')} aria-label="Go to monitors">
           <span className="brand-mark">▚</span> Pulse
-        </div>
+        </button>
 
         <div className="nav">
           {NAV.map((n) => (

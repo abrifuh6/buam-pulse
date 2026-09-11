@@ -113,6 +113,34 @@ export type StatusPageSettings = {
   public_url: string
 }
 
+
+export type SeriesPoint = {
+  at: string
+  uptime: number
+  latency_p50: number | null
+  latency_p95: number | null
+  checks: number
+}
+
+export type DetailIncident = {
+  started_at: string
+  resolved_at: string | null
+  minutes: number
+  planned: boolean
+  notified: boolean
+  cause: string | null
+}
+
+export type MonitorDetail = {
+  uptime_24h: number
+  uptime_7d: number
+  uptime_30d: number
+  avg_latency_ms: number | null
+  p95_latency_ms: number | null
+  series: SeriesPoint[]
+  incidents: DetailIncident[]
+}
+
 const TOKEN_KEY = 'pulse.token'
 
 export const token = {
@@ -306,6 +334,9 @@ export const api = {
 
   monitorChannels: (id: string) =>
     request<{ channel_ids: string[] }>(`/monitors/${id}/channels`),
+
+  monitorDetail: (id: string, window: '24h' | '7d' | '30d') =>
+    request<MonitorDetail>(`/monitors/${id}/detail?window=${window}`),
 
   setMonitorChannels: (id: string, channelIds: string[]) =>
     request<void>(`/monitors/${id}/channels`, {
