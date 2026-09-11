@@ -135,7 +135,7 @@ export default function App() {
               <UptimeBar daily={m.daily_uptime} />
               <div className="axis">
                 <span>90 days ago</span>
-                <span>Today</span>
+                <span>Today (UTC)</span>
               </div>
             </>
           )}
