@@ -140,3 +140,11 @@
 - Status page now reads the rollup in ONE query for all monitors, removing the earlier N+1; today is still computed live since it is incomplete
 - Scale rationale: 149 raw rows occupy 328 kB (~2.2 kB/row with overhead and index); at 30s intervals a hundred monitors reach ~26M rows and ~57 GB over 90 days. The rollup replaces each monitor-day with one ~100-byte row.
 - RUN_ONCE=true makes the service usable as a Kubernetes CronJob
+
+## 2026-09-11 — Phase 3.7 step 1: content checks and TLS expiry
+- Keyword assertions: body must (or must not) contain a string, case-insensitive, body capped at 1 MiB so a huge response can't exhaust a worker
+- failure_kind on every result (connect/timeout/status/keyword/blocked) so an alert can explain itself
+- Checks now use a fresh transport per request: reusing a pooled connection would skip DNS and the TLS handshake, flattering the measured latency and never re-reading the certificate
+- TLS expiry recorded per monitor; warning email once per certificate (ssl_alerted_for), NOT an incident — the site is up, and opening one would corrupt uptime figures
+- pulse_cert_days_remaining gauge for Prometheus alerting
+- SSRF guard made an explicit option rather than unconditional, so tests can target 127.0.0.1 deliberately instead of the guard being weakened to allow localhost
