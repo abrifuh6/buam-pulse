@@ -89,12 +89,21 @@ func (s *Server) SetMonitorChannels(w http.ResponseWriter, r *http.Request) {
 	for _, cid := range in.ChannelIDs {
 		// The tenant filter is inside the INSERT, so a caller cannot route a
 		// monitor to another tenant's channel by supplying its ID.
-		if _, err := tx.Exec(r.Context(), `
+		tag, err := tx.Exec(r.Context(), `
 			INSERT INTO monitor_channels (monitor_id, channel_id)
 			SELECT $1, id FROM alert_channels WHERE id=$2 AND tenant_id=$3`,
-			id, cid, c.TenantID); err != nil {
+			id, cid, c.TenantID)
+		if err != nil {
 			slog.Error("set monitor channel", "monitor", id, "channel", cid, "err", err)
-			writeErr(w, 400, "invalid channel in selection")
+			writeErr(w, 500, "db")
+			return
+		}
+		// A channel that does not exist (or belongs to another tenant) inserts
+		// zero rows without erroring. Checking the row count turns that silent
+		// no-op into an explicit rejection, so a client with a stale ID learns
+		// its routing was not applied instead of believing it was.
+		if tag.RowsAffected() == 0 {
+			writeErr(w, 400, "unknown alert channel in selection")
 			return
 		}
 	}
