@@ -29,6 +29,43 @@ jobs:
       - uses: azure/setup-helm@v4
       - run: helm lint deploy/helm/pulse -f deploy/helm/pulse/values-dev.yaml
 
+  # ---- Infrastructure: scan Terraform before anything is applied --------
+  infra:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.10.5"
+      # fmt and validate catch the errors that would otherwise be found by a
+      # failed apply, which is the expensive way to find them.
+      - name: Check formatting
+        run: terraform fmt -check -recursive infra/terraform
+      - name: Validate
+        working-directory: infra/terraform/environments/prod
+        run: terraform init -backend=false && terraform validate
+
+      # Checkov does not fail the build. Every remaining finding is a
+      # documented, deliberate trade-off recorded inline; failing on them would
+      # train people to add blanket skips. The SARIF upload puts them in the
+      # Security tab where a new one is visible against the accepted baseline.
+      - name: Scan infrastructure
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: infra/terraform
+          framework: terraform
+          soft_fail: true
+          output_format: cli,sarif
+          output_file_path: console,checkov.sarif
+      - name: Upload scan results
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: checkov.sarif
+
   # ---- 2. Build, scan, push: one job per service (matrix) ----------------
   build:
     needs: test

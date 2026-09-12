@@ -47,9 +47,22 @@ resource "aws_eks_cluster" "main" {
     bootstrap_cluster_creator_admin_permissions = true
   }
 
-  # Audit logs answer "who deleted that deployment". Control-plane logging is
-  # not free, but it is the difference between an incident review and a shrug.
-  enabled_cluster_log_types = ["api", "audit", "authenticator"]
+  # Kubernetes Secrets in etcd are base64, not encrypted, unless envelope
+  # encryption is configured. This is the difference between "someone read our
+  # etcd backup" being an incident and being a breach.
+  encryption_config {
+    provider {
+      key_arn = aws_kms_key.cluster.arn
+    }
+    resources = ["secrets"]
+  }
+
+  # All five log types. Audit answers "who deleted that deployment";
+  # controllerManager and scheduler answer "why did that pod never start",
+  # which is the question during an incident at 2am.
+  enabled_cluster_log_types = [
+    "api", "audit", "authenticator", "controllerManager", "scheduler",
+  ]
 
   depends_on = [aws_iam_role_policy_attachment.cluster_policy]
 
@@ -60,6 +73,14 @@ resource "aws_eks_cluster" "main" {
 resource "aws_cloudwatch_log_group" "cluster" {
   name              = "/aws/eks/${var.name}-${var.environment}/cluster"
   retention_in_days = 14
+  kms_key_id        = aws_kms_key.cluster.arn
+
+  # checkov:skip=CKV_AWS_338: Fourteen days, not a year. Audit logs are billed
+  # per GB ingested and per GB stored; a year of control-plane logs on a
+  # project with no compliance obligation is a bill, not a control. A regulated
+  # deployment would set 365 and accept the cost.
+
+  depends_on = [aws_kms_key_policy.cluster]
 }
 
 resource "aws_iam_role" "nodes" {
@@ -88,14 +109,55 @@ resource "aws_iam_role_policy_attachment" "nodes" {
   policy_arn = each.value
 }
 
+# A managed node group cannot set metadata options directly; they belong to a
+# launch template, which the group then references. This is the usual reason to
+# introduce a launch template into an otherwise managed setup.
+resource "aws_launch_template" "nodes" {
+  name_prefix = "${var.name}-${var.environment}-"
+
+  instance_type = var.node_instance_types[0]
+
+  # IMDSv2 required, with a hop limit of 1 so a container cannot reach the
+  # instance metadata service through the pod network. IMDSv1 lets any process
+  # that can issue an HTTP GET read the node's IAM credentials — the mechanism
+  # behind several well-known cloud breaches.
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 1
+    instance_metadata_tags      = "enabled"
+  }
+
+  monitoring {
+    enabled = true
+  }
+
+  # Tags must be set on the template to reach the instances it launches;
+  # provider default_tags do not propagate through a launch template.
+  tag_specifications {
+    resource_type = "instance"
+    tags = {
+      Name = "${var.name}-${var.environment}-node"
+    }
+  }
+
+  lifecycle { create_before_destroy = true }
+}
+
 resource "aws_eks_node_group" "main" {
   cluster_name    = aws_eks_cluster.main.name
   node_group_name = "${var.name}-${var.environment}-nodes"
   node_role_arn   = aws_iam_role.nodes.arn
   subnet_ids      = aws_subnet.private[*].id
 
-  instance_types = var.node_instance_types
-  capacity_type  = var.node_capacity_type
+  capacity_type = var.node_capacity_type
+
+  # Instance type lives on the launch template rather than here: a node group
+  # can set one or the other, not both.
+  launch_template {
+    id      = aws_launch_template.nodes.id
+    version = aws_launch_template.nodes.latest_version
+  }
 
   scaling_config {
     desired_size = 2

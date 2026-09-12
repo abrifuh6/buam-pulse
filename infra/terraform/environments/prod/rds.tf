@@ -18,8 +18,8 @@ resource "random_password" "db" {
 # encrypted but still contains the value; Secrets Manager gives rotation,
 # per-secret IAM, and an audit trail of every read.
 resource "aws_secretsmanager_secret" "db" {
-  name                    = "${var.name}/${var.environment}/database"
-  description             = "Pulse PostgreSQL credentials"
+  name        = "${var.name}/${var.environment}/database"
+  description = "Pulse PostgreSQL credentials"
   # Zero means a deleted secret is gone immediately rather than lingering for a
   # week and blocking a redeploy under the same name. Appropriate here; a real
   # production secret should keep the recovery window.
@@ -107,7 +107,7 @@ resource "aws_db_instance" "main" {
 
   # Minor versions apply themselves in the maintenance window; majors never do,
   # because a major upgrade can break queries and must be deliberate.
-  auto_minor_version_upgrade = true
+  auto_minor_version_upgrade  = true
   allow_major_version_upgrade = false
 
   # A final snapshot on destroy would block `terraform destroy` between working
@@ -120,9 +120,34 @@ resource "aws_db_instance" "main" {
   performance_insights_enabled          = true
   performance_insights_retention_period = 7
 
+  # OS-level metrics at 60s. Performance Insights shows which queries are slow;
+  # enhanced monitoring shows whether the instance is starved of CPU, memory or
+  # IO underneath them. The two answer different halves of "why is it slow".
+  monitoring_interval = 60
+  monitoring_role_arn = aws_iam_role.rds_monitoring.arn
+
   # Postgres logs to CloudWatch, so a crash is diagnosable after the instance
   # has been replaced.
   enabled_cloudwatch_logs_exports = ["postgresql"]
 
   tags = { Name = "${var.name}-${var.environment}" }
+}
+
+
+resource "aws_iam_role" "rds_monitoring" {
+  name = "${var.name}-${var.environment}-rds-monitoring"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { Service = "monitoring.rds.amazonaws.com" }
+      Action    = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "rds_monitoring" {
+  role       = aws_iam_role.rds_monitoring.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
 }

@@ -51,7 +51,7 @@ resource "aws_subnet" "public" {
     # These tags are not decorative: the AWS load balancer controller finds
     # subnets by looking for them. A public load balancer will silently fail to
     # provision without the elb role tag.
-    "kubernetes.io/role/elb"                        = "1"
+    "kubernetes.io/role/elb"                               = "1"
     "kubernetes.io/cluster/${var.name}-${var.environment}" = "shared"
   }
 }
@@ -63,8 +63,8 @@ resource "aws_subnet" "private" {
   availability_zone = local.azs[count.index]
 
   tags = {
-    Name = "${var.name}-private-${local.azs[count.index]}"
-    "kubernetes.io/role/internal-elb"               = "1"
+    Name                                                   = "${var.name}-private-${local.azs[count.index]}"
+    "kubernetes.io/role/internal-elb"                      = "1"
     "kubernetes.io/cluster/${var.name}-${var.environment}" = "shared"
   }
 }
