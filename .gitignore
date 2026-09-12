@@ -1,1 +1,17 @@
 .env
+
+# Terraform
+# .terraform/ holds downloaded provider binaries — hundreds of megabytes, and
+# reproducible from the lock file. Never committed.
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+# Variable files often carry credentials or account-specific values.
+*.tfvars
+*.tfvars.json
+!example.tfvars
+# The lock file IS committed: it pins provider versions so every machine and CI
+# runner resolves identically.
+!.terraform.lock.hcl
