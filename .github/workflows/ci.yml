@@ -55,9 +55,9 @@ jobs:
       - name: Scan infrastructure
         uses: bridgecrewio/checkov-action@v12
         with:
-          directory: infra/terraform
-          framework: terraform
-          soft_fail: true
+          # Same config file as local runs, so a finding that passes on a
+          # laptop passes in CI and nobody argues about which is authoritative.
+          config_file: .checkov.yml
           output_format: cli,sarif
           output_file_path: console,checkov.sarif
       - name: Upload scan results

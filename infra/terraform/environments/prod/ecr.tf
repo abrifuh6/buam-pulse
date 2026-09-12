@@ -10,6 +10,7 @@ locals {
 }
 
 resource "aws_ecr_repository" "service" {
+  # checkov:skip=CKV_AWS_136: AES256 with AWS-managed keys rather than a CMK. These images are public artifacts — the same builds are on Docker Hub — so there is nothing a customer-managed key would protect.
   for_each = toset(local.services)
 
   name                 = "${var.name}/${each.value}"

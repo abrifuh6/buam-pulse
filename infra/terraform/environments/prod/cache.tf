@@ -12,6 +12,9 @@ resource "aws_elasticache_subnet_group" "main" {
 }
 
 resource "aws_elasticache_replication_group" "main" {
+  # checkov:skip=CKV_AWS_30: Transit encryption is off deliberately. The queue carries monitor UUIDs and nothing else, the subnet has no internet route in either direction, and TLS adds a handshake to a dequeue loop that runs continuously. Wrong the moment anything identifying is queued.
+  # checkov:skip=CKV_AWS_31: Same reasoning, plus no auth token: access is already restricted to the node security group.
+  # checkov:skip=CKV_AWS_191: AWS-managed keys rather than a CMK. A CMK's value is key-deletion control, which matters for data under legal hold. A rebuildable queue is not that.
   replication_group_id = "${var.name}-${var.environment}"
   description          = "Pulse check queue"
 

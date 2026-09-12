@@ -6,6 +6,7 @@
 # quietly becomes wrong the moment the network changes.
 
 resource "aws_security_group" "nodes" {
+  # checkov:skip=CKV_AWS_382: Unrestricted egress is the product requirement, not an oversight. Pulse checks customer endpoints anywhere on the internet; an allow-list would have to contain the whole internet.
   name_prefix = "${var.name}-nodes-"
   description = "EKS worker nodes"
   vpc_id      = aws_vpc.main.id

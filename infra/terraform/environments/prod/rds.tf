@@ -7,6 +7,7 @@
 # git repository.
 
 resource "random_password" "db" {
+  # checkov:skip=CKV_SECRET_4: False positive — this is a generator, not a credential. The value never appears in source.
   length = 32
   # Excludes characters that break connection strings when they appear
   # unescaped: @ separates credentials from host, / separates the database name,
@@ -18,6 +19,7 @@ resource "random_password" "db" {
 # encrypted but still contains the value; Secrets Manager gives rotation,
 # per-secret IAM, and an audit trail of every read.
 resource "aws_secretsmanager_secret" "db" {
+  # checkov:skip=CKV_AWS_149: AWS-managed key. The control that matters here is who can read the secret, which IRSA handles.
   name        = "${var.name}/${var.environment}/database"
   description = "Pulse PostgreSQL credentials"
   # Zero means a deleted secret is gone immediately rather than lingering for a
@@ -74,6 +76,10 @@ resource "aws_db_parameter_group" "main" {
 }
 
 resource "aws_db_instance" "main" {
+  # checkov:skip=CKV_AWS_157: Single-AZ. Multi-AZ doubles the instance cost for automatic failover. With seven days of backups the exposure is recovery time, not data loss, and this deployment carries no revenue. The first thing to change for a real one.
+  # checkov:skip=CKV_AWS_293: Deletion protection off so `terraform destroy` works between working sessions. Correct here, dangerous anywhere real.
+  # checkov:skip=CKV_AWS_161: IAM database authentication not enabled. It is the better pattern, but requires token refresh in every service's connection logic. The password already lives in Secrets Manager. Tracked as a follow-up.
+  # checkov:skip=CKV_AWS_354: Performance Insights uses the default AWS key; a CMK here would protect query text, which for Pulse is its own SQL.
   identifier     = "${var.name}-${var.environment}"
   engine         = "postgres"
   engine_version = "16.4"

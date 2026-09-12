@@ -24,6 +24,8 @@ resource "aws_iam_role_policy_attachment" "cluster_policy" {
 }
 
 resource "aws_eks_cluster" "main" {
+  # checkov:skip=CKV_AWS_39: The API endpoint is public because there is no VPN or bastion here and kubectl must reach it from somewhere. Public is not open: every request is IAM-authenticated and authorised by EKS access entries.
+  # checkov:skip=CKV_AWS_38: Same. A CIDR allow-list from a laptop breaks when the ISP reassigns the address, and encourages widening the rule in a hurry during an incident.
   name     = "${var.name}-${var.environment}"
   role_arn = aws_iam_role.cluster.arn
   version  = var.cluster_version

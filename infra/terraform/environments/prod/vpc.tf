@@ -40,6 +40,7 @@ resource "aws_internet_gateway" "main" {
 }
 
 resource "aws_subnet" "public" {
+  # checkov:skip=CKV_AWS_130: Public subnets assign public IPs because that is what makes them public. They hold the load balancer and the NAT gateway; no workload runs here.
   count                   = var.az_count
   vpc_id                  = aws_vpc.main.id
   cidr_block              = local.public_subnets[count.index]
