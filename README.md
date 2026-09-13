@@ -1,163 +1,139 @@
-# Pulse — uptime monitoring & status pages
+# Pulse
 
-Built by Buam Technologies Inc. as a reference SaaS implementation for a
-multi-tenant monitoring platform. Go services, React frontends, Postgres,
-Redis; deployed to k3s (dev) and EKS (stage/prod) via Helm and ArgoCD.
+Uptime monitoring, alerting and status pages for small teams. Built as a
+complete SaaS product — not a demo — to exercise the full lifecycle from
+writing the application to running it on AWS.
 
-## Prerequisites (macOS)
+Pulse checks your sites and APIs from outside your network every 30 seconds,
+opens an incident when something fails twice in a row, alerts you by email or
+Slack within a minute, and publishes a status page your customers can read.
+ Marketing site            Dashboard              Status page
+  (public)                 (tenant)                (public)
+      │                       │                       │
+      └───────────────┬───────┴───────────────────────┘
+                      │
+                ┌─────▼─────┐
+                │    API    │  Go · chi · JWT · tenant-scoped
+                └─────┬─────┘
+                      │
+   ┌──────────────────┼──────────────────┬──────────────┐
+   │                  │                  │              │
+## What it does
 
-| Tool | Why | Install |
-|------|-----|---------|
-| Docker Desktop | runs Postgres + Redis locally, later k3s | https://www.docker.com/products/docker-desktop |
-| Homebrew | package manager for everything below | see below |
-| Go 1.22+ | the three backend services | `brew install go` |
-| golang-migrate | applies SQL migrations | `brew install golang-migrate` |
-| golangci-lint | linting (`make lint`) | `brew install golangci-lint` |
+**Monitoring.** HTTP and TCP checks on a schedule you choose, from 30 seconds
+to an hour. Content assertions catch the case status codes miss — a page can
+return 200 while rendering an error, and checking for expected text is the only
+way to see it. Every check opens a fresh connection, so the latency measured is
+what a first-time visitor experiences rather than a warm connection pool.
 
-```bash
-# Homebrew (skip if `which brew` prints a path)
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+**Alerting.** Two consecutive failures before an incident opens, so a single
+blip never pages anyone. An optional per-monitor delay filters short outages.
+Maintenance windows suppress alerts during planned work and mark the downtime
+as planned so it does not count against published uptime. Delivery retries with
+exponential backoff, and recovery is announced too.
 
-brew install go golang-migrate golangci-lint
-go version && migrate -version
-```
+**Status pages.** A public page per tenant with 90 days of uptime history, live
+incidents, per-service detail and your own branding. Choose which monitors
+appear — internal checks stay private.
 
-If `go` is still "command not found" on Apple Silicon, Homebrew is not on your
-PATH yet:
+**TLS certificates.** Every HTTPS check reads the certificate. A warning arrives
+two weeks before expiry, which is two weeks more notice than the browser error
+your customers would otherwise find first.
 
-```bash
-echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
-source ~/.zprofile
-```
+**Teams and billing.** Roles enforced server-side, invitations with single-use
+tokens, plan limits, Stripe subscriptions with monthly, quarterly and annual
+billing, 14-day trials, and data export and account deletion for GDPR and
+PIPEDA.
 
-Run `make doctor` at any time to confirm every tool is present.
+## Architecture
 
-## Phase 1 — running locally
+Five Go services sharing one PostgreSQL database, communicating through a Redis
+queue. This is a **modular monolith split by workload**, not microservices —
+the distinction and its reasoning are in
+[ADR 0007](docs/adr/0007-service-boundaries.md).
 
-One-time setup:
+| Service | Why it is separate |
+|---|---|
+| `api` | Request/response, scales with user traffic |
+| `scheduler` | Must run as exactly one replica; cannot live inside a service you want several copies of |
+| `worker` | Checks are I/O-bound and bursty; scales with customer count independently of API traffic |
+| `notifier` | A slow email provider must never delay a monitoring check |
+| `retention` | Heavy periodic rollups that should not compete with request handling |
+
+The frontends are three separate Vite apps — marketing site, dashboard, and
+status pages — deployed independently because they change on different cadences
+and the public ones need no API dependency at all.
+
+## Running it locally
+
+One command brings up Postgres, Redis, Mailpit and all five Go services with
+hot reload:
 
 ```bash
 cp .env.example .env
-make doctor        # verifies docker, go, migrate are installed
-make up            # starts postgres + redis in Docker
-make migrate-up    # creates the schema
-go mod tidy        # downloads Go dependencies (writes go.sum — commit it)
-make test          # unit tests, should pass
+make dev-up
+make migrate-up
 ```
 
-The three services are separate processes. Open **three terminal tabs**
-(Cmd+T in Terminal/iTerm), `cd` into the repo in each, and run one per tab:
-
-| Tab | Command | What you should see |
-|-----|---------|---------------------|
-| 1 | `make run-api` | `"msg":"api listening","port":"8080"` |
-| 2 | `make run-scheduler` | `"msg":"enqueued","count":N` every interval |
-| 3 | `make run-worker` | `"msg":"checked","ok":true,...` per monitor |
-
-Stop any service with Ctrl+C; it shuts down gracefully.
-
-Seed a tenant and a monitor (fourth tab, or a DB client):
+Then the three frontends:
 
 ```bash
-docker compose exec postgres psql -U pulse -d pulse
-```
-```sql
-INSERT INTO tenants (name, slug) VALUES ('Northgate Digital','northgate') RETURNING id;
--- paste the returned id below
-INSERT INTO monitors (tenant_id, name, type, target)
-VALUES ('<tenant id>', 'Example site', 'http', 'https://example.com');
+cd apps/web && npm run dev      # dashboard        http://localhost:5173
+cd apps/status && npm run dev   # status pages     http://localhost:5174
+cd apps/site && npm run dev     # marketing site   http://localhost:5175
 ```
 
-Within ~60s tab 2 logs an enqueue, tab 3 logs a check, and
-`SELECT * FROM check_results ORDER BY checked_at DESC LIMIT 5;` shows results.
+| | |
+|---|---|
+| API | http://localhost:8080 |
+| Mail (Mailpit) | http://localhost:8025 |
+| `make dev-logs` | tail everything, `S=worker` for one |
+| `make dev-down` | stop |
 
-Smoke-test the API: `curl -i localhost:8080/readyz` (expect 200) and
-`curl localhost:8080/metrics | head`.
+Billing needs a Stripe sandbox key in `.env` and `make stripe-setup` to create
+the products and prices. Webhooks need `stripe listen --forward-to
+localhost:8080/api/v1/billing/webhook`.
 
-Tear down: `make down` (data persists in the `pgdata` volume;
-`docker compose down -v` wipes it).
+## Infrastructure
 
-## Repository layout
-
-```
-apps/        api, scheduler, worker (Go) — web, status (React) added in Phase 3
-internal/    shared Go packages: config, db, queue, checks
-migrations/  SQL schema, applied with golang-migrate
-deploy/      Helm chart + ArgoCD manifests (Phase 2/4)
-infra/       Terraform modules + Ansible (Phase 4)
-docs/adr/    architecture decision records
-```
-
-## Roadmap
-
-1. Local Go services (this phase)
-2. Dockerfiles, Helm chart, k3s on Docker Desktop
-3. GitHub Actions CI, React dashboard + status pages
-4. Terraform: VPC, EKS, RDS, ElastiCache; ArgoCD stage
-5. Prod, alerting, SLO dashboards, autoscaling
-6. Chaos exercises, postmortems, runbooks
-
-
-
-## API walkthrough (Phase 1 step 2)
-
-Add `JWT_SECRET=<any long random string>` to your `.env`, restart the API, then:
+Terraform builds a single EKS cluster in `ca-central-1` with namespace
+separation per environment, RDS PostgreSQL, ElastiCache Valkey, ECR, and a
+three-tier VPC where the data subnets have no internet route in either
+direction.
 
 ```bash
-# 1. sign up — creates the tenant and returns a token
-curl -s localhost:8080/api/v1/auth/signup \
-  -H "Content-Type: application/json" \
-  -d '{"company":"Northgate Digital","email":"you@example.com","password":"correct-horse-battery"}'
-
-export TOKEN=<paste token>
-
-# 2. create a monitor
-curl -s localhost:8080/api/v1/monitors -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Example","type":"http","target":"https://example.com","interval_seconds":30}'
-
-# 3. list monitors (status flips to "up" after the first check)
-curl -s localhost:8080/api/v1/monitors -H "Authorization: Bearer $TOKEN"
-
-# 4. results
-curl -s localhost:8080/api/v1/monitors/<id>/results -H "Authorization: Bearer $TOKEN"
+cd infra/terraform/environments/prod
+terraform init && terraform apply
 ```
 
+Checkov runs against it in CI. All 105 passing checks are genuine; the 24
+skipped ones each carry an inline comment explaining the trade-off, because an
+undocumented suppression looks like diligence while hiding a decision nobody
+argued for.
 
-## Metrics
+## Pipeline
 
-Every service exposes Prometheus metrics:
+Every push runs static checks, race-enabled tests, `helm lint`, frontend type
+checks, and Terraform validation. Then a parallel matrix builds nine images,
+scans each with Trivy, and — only if the scan finds no fixable critical or high
+vulnerability — publishes multi-architecture images to GHCR and Docker Hub
+tagged by commit SHA.
 
-| Service | URL |
-|---------|-----|
-| api | http://localhost:8080/metrics |
-| worker | http://localhost:9090/metrics |
-| scheduler | http://localhost:9091/metrics |
+## Decisions worth reading
 
-```bash
-curl -s localhost:9090/metrics | grep ^pulse_
-```
+| | |
+|---|---|
+| [0001](docs/adr/0001-monorepo-and-service-split.md) | Monorepo and the service split |
+| [0002](docs/adr/0002-migration-hook-ordering.md) | Migrations run post-install, pre-upgrade |
+| [0003](docs/adr/0003-same-origin-frontend.md) | Same-origin frontend, separate deployment |
+| [0004](docs/adr/0004-outbound-request-safety.md) | SSRF and abuse: a monitoring service fetches arbitrary URLs |
+| [0005](docs/adr/0005-rate-limiting.md) | In-memory rate limiting and its known limits |
+| [0006](docs/adr/0006-stripe-subscription-identity.md) | One tracked subscription per tenant |
+| [0007](docs/adr/0007-service-boundaries.md) | Split by workload, not by domain |
 
+Also: [architecture](docs/ARCHITECTURE.md), [operations](docs/OPERATIONS.md),
+[roadmap](docs/ROADMAP.md), [changelog](docs/CHANGELOG.md).
 
-## CI/CD
+## Built by
 
-Every push runs `.github/workflows/ci.yml`: static checks and tests, then a parallel build of the four service images, a Trivy vulnerability scan, and — on `main` only — a push to `ghcr.io/abrifuh6/pulse-*` and `docker.io/buamtech/pulse-*`, tagged by git SHA.
-## Reaching the dev cluster in a browser
-
-Docker Desktop's Kubernetes nodes don't publish port 80 to the host, so forward
-the ingress controller in its own terminal tab:
-
-```bash
-make ingress-forward     # sudo; keep this tab open
-```
-
-Then:
-
-| App | URL |
-|-----|-----|
-| Dashboard + API | http://pulse.localtest.me |
-| Status page | http://status.localtest.me/\&lt\;tenant-slug\&gt\; |
-
-`localtest.me` is a public domain whose records all point at 127.0.0.1, so no
-/etc/hosts editing is needed. In EKS this forward disappears — the ingress sits
-behind a real load balancer with real DNS.
+[Buam Technologies Inc.](https://github.com/abrifuh6) — Abri Fuh

@@ -82,7 +82,10 @@ resource "aws_db_instance" "main" {
   # checkov:skip=CKV_AWS_354: Performance Insights uses the default AWS key; a CMK here would protect query text, which for Pulse is its own SQL.
   identifier     = "${var.name}-${var.environment}"
   engine         = "postgres"
-  engine_version = "16.4"
+  # Major version only. Pinning a minor version means the apply breaks the day
+  # AWS retires it, which is exactly what happened with 16.4. Minor upgrades
+  # apply themselves in the maintenance window; the major stays deliberate.
+  engine_version = "16"
   instance_class = var.db_instance_class
 
   db_name  = "pulse"
