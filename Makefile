@@ -108,3 +108,12 @@ dev-ps:
 
 dev-restart:   ## restart one service, e.g. make dev-restart S=worker
 	$(COMPOSE_DEV) restart $(S)
+
+aws-down:      ## tear down AWS, removing controller-created resources first
+	@echo "Removing the Helm release so the load balancer controller deletes its ALB."
+	@echo "Terraform cannot do this: the ALB was created by a controller inside the"
+	@echo "cluster, so it is absent from state — and its network interfaces block"
+	@echo "subnet deletion, which is how this surfaces."
+	-helm uninstall pulse -n pulse --wait
+	@sleep 60
+	cd infra/terraform/environments/prod && terraform destroy -auto-approve
