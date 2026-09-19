@@ -16,7 +16,7 @@ spec:
       securityContext: { runAsNonRoot: true, runAsUser: 65532 }
       containers:
         - name: worker
-          image: {{ .Values.image.prefix }}-worker:{{ .Values.image.tag }}
+          image: {{ .Values.image.prefix }}{{ .Values.image.separator | default "-" }}worker:{{ .Values.image.tag }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             {{- include "pulse.env" . | nindent 12 }}

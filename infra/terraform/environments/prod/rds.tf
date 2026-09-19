@@ -160,3 +160,28 @@ resource "aws_iam_role_policy_attachment" "rds_monitoring" {
   role       = aws_iam_role.rds_monitoring.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonRDSEnhancedMonitoringRole"
 }
+
+# Application secrets that are not database credentials but are still
+# credentials. The JWT signing key in particular: anyone holding it can forge a
+# token for any tenant, so it belongs in Secrets Manager rather than a values
+# file that lands in git and in every Helm release record.
+resource "random_password" "jwt" {
+  # checkov:skip=CKV_SECRET_4: Generator, not a credential.
+  length  = 64
+  special = false # base64-safe, so it survives every config format unescaped
+}
+
+resource "aws_secretsmanager_secret" "app" {
+  # checkov:skip=CKV_AWS_149: AWS-managed key; the control that matters is the
+  # IRSA policy restricting who can read it.
+  name                    = "${var.name}/${var.environment}/app"
+  description             = "Pulse application secrets"
+  recovery_window_in_days = 0
+}
+
+resource "aws_secretsmanager_secret_version" "app" {
+  secret_id = aws_secretsmanager_secret.app.id
+  secret_string = jsonencode({
+    jwt_secret = random_password.jwt.result
+  })
+}

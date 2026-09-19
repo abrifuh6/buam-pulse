@@ -18,7 +18,7 @@ spec:
       securityContext: { runAsNonRoot: true, runAsUser: 101, runAsGroup: 101 }
       containers:
         - name: {{ $name }}
-          image: {{ $.Values.image.prefix }}-{{ $name }}:{{ $.Values.image.tag }}
+          image: {{ $.Values.image.prefix }}{{ $.Values.image.separator | default "-" }}{{ $name }}:{{ $.Values.image.tag }}
           imagePullPolicy: {{ $.Values.image.pullPolicy }}
           ports: [{ containerPort: 8080, name: http }]
           readinessProbe:

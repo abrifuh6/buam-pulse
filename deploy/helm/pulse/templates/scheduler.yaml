@@ -17,7 +17,7 @@ spec:
       securityContext: { runAsNonRoot: true, runAsUser: 65532 }
       containers:
         - name: scheduler
-          image: {{ .Values.image.prefix }}-scheduler:{{ .Values.image.tag }}
+          image: {{ .Values.image.prefix }}{{ .Values.image.separator | default "-" }}scheduler:{{ .Values.image.tag }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env: {{- include "pulse.env" . | nindent 12 }}
           ports: [{ containerPort: {{ .Values.metricsPort }}, name: metrics }]

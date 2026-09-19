@@ -63,3 +63,36 @@ resource "aws_vpc_security_group_ingress_rule" "cache_from_nodes" {
   ip_protocol                  = "tcp"
   description                  = "Redis from EKS nodes"
 }
+
+
+# Pods do not use the node security group.
+#
+# With the VPC CNI, every pod gets its own ENI carrying the cluster security
+# group that EKS creates and manages itself — not the group attached to the
+# node instances. A rule that allows the node group therefore allows the
+# kubelet but not the workload, which shows up as a connection timeout rather
+# than a refusal, because the packets are dropped rather than rejected.
+#
+# This is the single most common EKS networking surprise.
+data "aws_eks_cluster" "main" {
+  name       = aws_eks_cluster.main.name
+  depends_on = [aws_eks_cluster.main]
+}
+
+resource "aws_vpc_security_group_ingress_rule" "db_from_cluster" {
+  security_group_id            = aws_security_group.database.id
+  referenced_security_group_id = data.aws_eks_cluster.main.vpc_config[0].cluster_security_group_id
+  from_port                    = 5432
+  to_port                      = 5432
+  ip_protocol                  = "tcp"
+  description                  = "PostgreSQL from pods (EKS-managed cluster security group)"
+}
+
+resource "aws_vpc_security_group_ingress_rule" "cache_from_cluster" {
+  security_group_id            = aws_security_group.cache.id
+  referenced_security_group_id = data.aws_eks_cluster.main.vpc_config[0].cluster_security_group_id
+  from_port                    = 6379
+  to_port                      = 6379
+  ip_protocol                  = "tcp"
+  description                  = "Redis from pods (EKS-managed cluster security group)"
+}

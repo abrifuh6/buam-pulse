@@ -1,0 +1,54 @@
+# Production values. Everything environment-specific lives here; the templates
+# are identical to the ones running locally.
+
+image:
+  prefix: 145185392063.dkr.ecr.ca-central-1.amazonaws.com/pulse
+  # ECR treats pulse/api as a repository path; GHCR and Docker Hub treat
+  # pulse-api as a single repository name. The separator is the only difference,
+  # so it is a value rather than two charts.
+  separator: "/"
+  tag: latest
+  pullPolicy: Always
+
+api:
+  replicas: 2
+worker:
+  replicas: 2
+  region: ca-central-1
+web:
+  replicas: 2
+status:
+  replicas: 2
+
+# Managed services replace the in-cluster ones. RDS and ElastiCache handle
+# backups, failover and patching — four jobs not worth owning for a database
+# that cannot be rebuilt from a git repository.
+postgres:
+  enabled: false
+redis:
+  enabled: false
+
+externalSecrets:
+  enabled: true
+  region: ca-central-1
+  namespace: external-secrets
+  serviceAccount: external-secrets
+  databaseSecret: pulse/prod/database
+  extra:
+    JWT_SECRET:
+      key: pulse/prod/app
+      property: jwt_secret
+
+secrets:
+  # DATABASE_URL comes from Secrets Manager via ExternalSecret, so it is
+  # deliberately absent here.
+  databaseUrl: ""
+  redisUrl: "redis://pulse-prod.xnezqa.ng.0001.cac1.cache.amazonaws.com:6379/0"
+  # JWT_SECRET comes from Secrets Manager, so nothing sensitive is in this file.
+  jwtSecret: ""
+
+ingress:
+  enabled: true
+  className: alb
+  appHost: ""
+  statusHost: ""
