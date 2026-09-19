@@ -4,13 +4,35 @@ kind: Ingress
 metadata:
   name: pulse
   labels: {{- include "pulse.labels" . | nindent 4 }}
+  annotations:
+    {{- if eq .Values.ingress.className "alb" }}
+    # IP targets rather than instance targets: the ALB registers pod IPs
+    # directly, so traffic skips the node hop, and instance mode would require
+    # every service to be NodePort — a port open on every node for no benefit.
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    # The API answers /healthz; the frontends are nginx serving static files and
+    # answer / instead. A single health-check path has to work for both, so it
+    # is set per-service via annotations on the Services rather than here.
+    alb.ingress.kubernetes.io/healthcheck-path: /
+    alb.ingress.kubernetes.io/success-codes: "200,404"
+    # One ALB for every rule in this group. An ALB is billed hourly, so sharing
+    # one across hosts rather than provisioning per-Ingress halves the cost.
+    alb.ingress.kubernetes.io/group.name: pulse
+    {{- end }}
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   rules:
-    # Dashboard host: /api/* goes to the API, everything else to the SPA.
-    # Order matters — the more specific prefix must come first.
-    - host: {{ .Values.ingress.appHost }}
-      http:
+    # Dashboard: /api/* to the API, everything else to the SPA. Order matters —
+    # the more specific prefix must come first.
+    #
+    # When appHost is empty the rule matches any host, which is what a
+    # deployment without DNS needs: the ALB's own hostname is the entry point.
+    # With two host-less rules the first would shadow the second, so the status
+    # host is only added when it is actually set.
+    - {{ if .Values.ingress.appHost }}host: {{ .Values.ingress.appHost | quote }}
+      {{ end }}http:
         paths:
           - path: /api
             pathType: Prefix
@@ -18,15 +40,26 @@ spec:
               service:
                 name: pulse-api
                 port: { name: http }
-          - path: /
+          # The dashboard lives under /app. A visitor landing on the root
+          # should meet the marketing site and decide to sign up — not be
+          # dropped straight into a login form for a product they have not
+          # been told about yet.
+          - path: /app
             pathType: Prefix
             backend:
               service:
                 name: pulse-web
                 port: { name: http }
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pulse-site
+                port: { name: http }
 
-    # Status pages: separate host, same split (the SPA calls /api/v1/public/*).
-    - host: {{ .Values.ingress.statusHost }}
+    {{- if .Values.ingress.statusHost }}
+    # Status pages on their own host, same split (the SPA calls /api/v1/public/*).
+    - host: {{ .Values.ingress.statusHost | quote }}
       http:
         paths:
           - path: /api
@@ -41,4 +74,5 @@ spec:
               service:
                 name: pulse-status
                 port: { name: http }
+    {{- end }}
 {{- end }}

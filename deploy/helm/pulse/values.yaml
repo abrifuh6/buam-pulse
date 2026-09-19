@@ -37,6 +37,9 @@ secrets:
   redisUrl: ""
   jwtSecret: ""
 
+site:
+  replicas: 1
+
 web:
   replicas: 2
   resources:

@@ -1,4 +1,13 @@
-{{- range $name := (list "web" "status") }}
+{{- /*
+  Three static frontends, identical apart from their image and name:
+    site   — the marketing site, what a visitor sees first
+    web    — the dashboard, behind sign-in
+    status — public status pages
+  They are looped rather than written three times because nothing about them
+  differs structurally; a change to the nginx config or probes should not have
+  to be made in three places.
+*/ -}}
+{{- range $name := (list "site" "web" "status") }}
 {{- $cfg := index $.Values $name }}
 ---
 apiVersion: apps/v1
