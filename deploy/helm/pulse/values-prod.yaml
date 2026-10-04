@@ -19,6 +19,7 @@ site:
   replicas: 2
 web:
   replicas: 2
+  basePath: "/app"
 status:
   replicas: 2
 

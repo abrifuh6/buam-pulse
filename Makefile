@@ -117,3 +117,12 @@ aws-down:      ## tear down AWS, removing controller-created resources first
 	-helm uninstall pulse -n pulse --wait
 	@sleep 60
 	cd infra/terraform/environments/prod && terraform destroy -auto-approve
+
+check-context: ## fail unless kubectl is pointed at the EKS cluster
+	@ctx=$$(kubectl config current-context); \
+	case "$$ctx" in \
+	  *pulse-prod) echo "context: $$ctx" ;; \
+	  *) echo "Refusing: kubectl is on '$$ctx', not pulse-prod."; \
+	     echo "Run: aws eks update-kubeconfig --region ca-central-1 --name pulse-prod"; \
+	     exit 1 ;; \
+	esac

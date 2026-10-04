@@ -29,6 +29,11 @@ spec:
         - name: {{ $name }}
           image: {{ $.Values.image.prefix }}{{ $.Values.image.separator | default "-" }}{{ $name }}:{{ $.Values.image.tag }}
           imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          env:
+            # Tells nginx which prefix to strip. Empty for apps served at the
+            # root; /app for the dashboard.
+            - name: BASE_PATH
+              value: {{ (index $.Values $name).basePath | default "" | quote }}
           ports: [{ containerPort: 8080, name: http }]
           readinessProbe:
             httpGet: { path: /healthz, port: http }
