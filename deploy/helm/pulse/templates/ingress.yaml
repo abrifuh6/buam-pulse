@@ -6,73 +6,55 @@ metadata:
   labels: {{- include "pulse.labels" . | nindent 4 }}
   annotations:
     {{- if eq .Values.ingress.className "alb" }}
-    # IP targets rather than instance targets: the ALB registers pod IPs
-    # directly, so traffic skips the node hop, and instance mode would require
-    # every service to be NodePort — a port open on every node for no benefit.
     alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
-    # The API answers /healthz; the frontends are nginx serving static files and
-    # answer / instead. A single health-check path has to work for both, so it
-    # is set per-service via annotations on the Services rather than here.
-    alb.ingress.kubernetes.io/healthcheck-path: /
-    alb.ingress.kubernetes.io/success-codes: "200,404"
-    # One ALB for every rule in this group. An ALB is billed hourly, so sharing
-    # one across hosts rather than provisioning per-Ingress halves the cost.
+    # Listen on both ports. HTTP exists only to redirect to HTTPS — no traffic
+    # is ever served in the clear.
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/certificate-arn: {{ .Values.ingress.certificateArn | quote }}
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    # Modern TLS only.
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
+    alb.ingress.kubernetes.io/success-codes: "200"
     alb.ingress.kubernetes.io/group.name: pulse
     {{- end }}
 spec:
   ingressClassName: {{ .Values.ingress.className }}
   rules:
-    # Dashboard: /api/* to the API, everything else to the SPA. Order matters —
-    # the more specific prefix must come first.
-    #
-    # When appHost is empty the rule matches any host, which is what a
-    # deployment without DNS needs: the ALB's own hostname is the entry point.
-    # With two host-less rules the first would shadow the second, so the status
-    # host is only added when it is actually set.
-    - {{ if .Values.ingress.appHost }}host: {{ .Values.ingress.appHost | quote }}
-      {{ end }}http:
+    # Marketing site on the apex.
+    - host: {{ .Values.ingress.siteHost | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: pulse-site, port: { name: http } }
+
+    # Dashboard on its own host. /api goes to the API, everything else to the
+    # SPA. No path prefix, because the host does the separating.
+    - host: {{ .Values.ingress.appHost | quote }}
+      http:
         paths:
           - path: /api
             pathType: Prefix
             backend:
-              service:
-                name: pulse-api
-                port: { name: http }
-          # The dashboard lives under /app. A visitor landing on the root
-          # should meet the marketing site and decide to sign up — not be
-          # dropped straight into a login form for a product they have not
-          # been told about yet.
-          - path: /app
-            pathType: Prefix
-            backend:
-              service:
-                name: pulse-web
-                port: { name: http }
+              service: { name: pulse-api, port: { name: http } }
           - path: /
             pathType: Prefix
             backend:
-              service:
-                name: pulse-site
-                port: { name: http }
+              service: { name: pulse-web, port: { name: http } }
 
-    {{- if .Values.ingress.statusHost }}
-    # Status pages on their own host, same split (the SPA calls /api/v1/public/*).
+    # Status pages on their own host.
     - host: {{ .Values.ingress.statusHost | quote }}
       http:
         paths:
           - path: /api
             pathType: Prefix
             backend:
-              service:
-                name: pulse-api
-                port: { name: http }
+              service: { name: pulse-api, port: { name: http } }
           - path: /
             pathType: Prefix
             backend:
-              service:
-                name: pulse-status
-                port: { name: http }
-    {{- end }}
+              service: { name: pulse-status, port: { name: http } }
 {{- end }}

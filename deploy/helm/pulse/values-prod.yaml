@@ -19,7 +19,6 @@ site:
   replicas: 2
 web:
   replicas: 2
-  basePath: "/app"
 status:
   replicas: 2
 
@@ -53,5 +52,7 @@ secrets:
 ingress:
   enabled: true
   className: alb
-  appHost: ""
-  statusHost: ""
+  appHost: app.buamtech.live
+  statusHost: status.buamtech.live
+  siteHost: buamtech.live
+  certificateArn: "arn:aws:acm:ca-central-1:145185392063:certificate/8bd42148-863f-409b-af68-c46b9c94053f"

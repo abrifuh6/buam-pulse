@@ -126,3 +126,7 @@ check-context: ## fail unless kubectl is pointed at the EKS cluster
 	     echo "Run: aws eks update-kubeconfig --region ca-central-1 --name pulse-prod"; \
 	     exit 1 ;; \
 	esac
+
+aws-up:        ## build the cluster, handling the EKS log group collision
+	-cd infra/terraform/environments/prod && terraform import aws_cloudwatch_log_group.cluster /aws/eks/pulse-prod/cluster
+	cd infra/terraform/environments/prod && terraform apply -auto-approve
