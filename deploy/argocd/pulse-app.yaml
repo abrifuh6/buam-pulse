@@ -1,0 +1,44 @@
+# Tells ArgoCD what to keep in sync: the Helm chart in this repo, deployed to
+# the pulse namespace, with the production values.
+#
+# This is the whole GitOps idea in one file — the desired state lives in git,
+# and ArgoCD's job is to make the cluster match it continuously.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pulse
+  namespace: argocd
+  # Keeps ArgoCD from deleting the app if the Application object itself is
+  # removed by accident.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/abrifuh6/buam-pulse.git
+    targetRevision: main
+    path: deploy/helm/pulse
+    helm:
+      valueFiles:
+        - values-prod.yaml
+      # The image tag is the one thing that changes every deploy. CI will patch
+      # this line; everything else comes from the chart.
+      parameters:
+        - name: image.tag
+          value: 20261005-190926
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: pulse
+
+  syncPolicy:
+    automated:
+      # Revert manual changes back to what git says. This is the teeth of
+      # GitOps — without it, ArgoCD only reports drift instead of fixing it.
+      selfHeal: true
+      # Delete resources that were removed from git, rather than leaving
+      # orphans running.
+      prune: true
+    syncOptions:
+      - CreateNamespace=true
