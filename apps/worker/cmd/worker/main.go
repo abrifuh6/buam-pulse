@@ -42,7 +42,7 @@ func main() {
 	}
 	ctx := context.Background()
 
-	pool, err := db.Connect(ctx, cfg.DatabaseURL)
+	pool, err := db.ConnectWithRetry(ctx, cfg.DatabaseURL, log)
 	if err != nil {
 		log.Error("db", "err", err)
 		os.Exit(1)
