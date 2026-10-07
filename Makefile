@@ -110,12 +110,20 @@ dev-restart:   ## restart one service, e.g. make dev-restart S=worker
 	$(COMPOSE_DEV) restart $(S)
 
 aws-down:      ## tear down AWS, removing controller-created resources first
-	@echo "Removing the Helm release so the load balancer controller deletes its ALB."
-	@echo "Terraform cannot do this: the ALB was created by a controller inside the"
-	@echo "cluster, so it is absent from state — and its network interfaces block"
-	@echo "subnet deletion, which is how this surfaces."
-	-helm uninstall pulse -n pulse --wait
-	@sleep 60
+	@echo "Deleting the load balancer the controller created, before Terraform"
+	@echo "touches the network. A Helm uninstall alone does not wait long enough"
+	@echo "for its network interfaces to release, which blocks subnet deletion."
+	-helm uninstall pulse -n pulse --wait --timeout 3m
+	-ALB=$$(aws elbv2 describe-load-balancers --region ca-central-1 \
+		--query "LoadBalancers[?contains(LoadBalancerName, 'k8s-pulse')].LoadBalancerArn" \
+		--output text); \
+		[ -n "$$ALB" ] && aws elbv2 delete-load-balancer --region ca-central-1 --load-balancer-arn $$ALB || true
+	@echo "Waiting 120s for network interfaces and security groups to release."
+	@sleep 120
+	-for sg in $$(aws ec2 describe-security-groups --region ca-central-1 \
+		--filters "Name=group-name,Values=k8s-*" --query 'SecurityGroups[].GroupId' --output text); do \
+		aws ec2 delete-security-group --region ca-central-1 --group-id $$sg || true; \
+	done
 	cd infra/terraform/environments/prod && terraform destroy -auto-approve
 
 check-context: ## fail unless kubectl is pointed at the EKS cluster
