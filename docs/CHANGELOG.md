@@ -186,3 +186,34 @@
 - Webhook maps any of a plan's three price IDs back to the plan, so changing period in the portal keeps the plan instead of appearing to have none
 - Marketing site plan choice carries through signup into Stripe Checkout: without it a visitor who picked Pro landed on an empty dashboard and had to choose again, which is where signups get abandoned
 - Plan cards are selectable in both apps; in the dashboard, selecting one previews whether current usage fits before switching
+
+## 2026-09-20 — Phase 4: AWS infrastructure
+- Terraform for a single EKS cluster in ca-central-1, environments by namespace
+- Three-tier VPC: public (ALB, NAT), private (nodes), data (RDS, ElastiCache) with no internet route in either direction
+- RDS PostgreSQL and ElastiCache Valkey, both managed; ECR with immutable tags and lifecycle pruning
+- One shared NAT gateway and spot nodes, documented as deliberate cost trades
+- S3-native state locking (Terraform 1.10), no DynamoDB lock table
+- 85 resources, reproducible from an empty account in ~18 minutes
+
+## 2026-09-20 — Phase 4: security hardening
+- EKS Secrets encrypted with a customer KMS key; all five control-plane log types enabled
+- IMDSv2 enforced via launch template, hop limit 1, so a container cannot steal the node's credentials
+- VPC flow logs (REJECT traffic) and RDS enhanced monitoring
+- Checkov in CI: 105 checks pass, 24 skipped each with an inline reason
+
+## 2026-09-20 — Phase 4: secrets and access
+- Credentials in Secrets Manager, reaching pods through External Secrets via an IRSA role scoped to one service account
+- AWS Load Balancer Controller provisions the ALB from the Ingress with IP targets
+- Database URL never appears in a Helm value, a CI log, or a shell history
+
+## 2026-10-04 — Custom domain and HTTPS
+- Route 53 hosted zone (separate Terraform state, survives teardown), ACM wildcard certificate, DNS-validated
+- Host-based routing: buamtech.live (site), app.buamtech.live (dashboard), status.buamtech.live (status pages)
+- TLS 1.2+ at the ALB, HTTP redirects to HTTPS
+- Removed the /app path prefix and its whole class of base-path and MIME-type problems
+
+## 2026-10-05 — GitOps and reliability
+- ArgoCD reconciles Pulse from git with self-heal and prune; cluster corrects manual drift automatically
+- notifier and retention added to the Helm chart — alerts and rollups now run in production, not just locally
+- Services retry and log database connection at startup instead of exiting silently, which had turned a security-group typo into an hour of debugging
+- make aws-down deletes the controller-created ALB and security groups before terraform destroy, so teardown no longer fails on leftover network interfaces
