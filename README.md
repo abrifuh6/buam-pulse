@@ -15,17 +15,28 @@ writing the application to running it on AWS.
 Pulse checks your sites and APIs from outside your network every 30 seconds,
 opens an incident when something fails twice in a row, alerts you by email or
 Slack within a minute, and publishes a status page your customers can read.
- Marketing site            Dashboard              Status page
-  (public)                 (tenant)                (public)
-      │                       │                       │
-      └───────────────┬───────┴───────────────────────┘
-                      │
-                ┌─────▼─────┐
-                │    API    │  Go · chi · JWT · tenant-scoped
-                └─────┬─────┘
-                      │
-   ┌──────────────────┼──────────────────┬──────────────┐
-   │                  │                  │              │
+```mermaid
+flowchart TB
+    users([Customers]) --> site[Marketing site]
+    users --> dash[Dashboard]
+    public([Public]) --> status[Status pages]
+
+    site --> api["API — Go, JWT, tenant-scoped"]
+    dash --> api
+    status --> api
+
+    api --> sched[scheduler]
+    sched --> queue[(Redis queue)]
+    queue --> worker[worker]
+    worker --> internet([Customer websites])
+
+    api --> db[(PostgreSQL)]
+    worker --> db
+    notifier[notifier] --> db
+    notifier --> alerts([Email / Slack])
+    retention[retention] --> db
+```
+
 ## What it does
 
 **Monitoring.** HTTP and TCP checks on a schedule you choose, from 30 seconds
