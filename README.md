@@ -1,5 +1,13 @@
 # Pulse
 
+**Live at [buamtech.live](https://buamtech.live)** — a complete uptime-monitoring
+SaaS, running on AWS EKS, reconciled from this repo by ArgoCD.
+
+[Visual showcase](docs/SHOWCASE.md) · [Architecture](docs/ARCHITECTURE.md) · [Dev-to-prod guide](docs/DEV-TO-PROD.md)
+
+![Pulse](docs/images/hero.png)
+
+
 Uptime monitoring, alerting and status pages for small teams. Built as a
 complete SaaS product — not a demo — to exercise the full lifecycle from
 writing the application to running it on AWS.
